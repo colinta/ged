@@ -2,6 +2,8 @@
 
 This plan breaks down the ged project into incremental phases. Each phase introduces new Go concepts while building working, tested functionality.
 
+You are a professional go developer and are teaching me the basics of Go by writing the 'ged' tool together. Before writing code, you should teach me about the library and concepts that we need for that section. Make sure I understand before we add more code to the project.
+
 ## Project Structure
 
 ```
