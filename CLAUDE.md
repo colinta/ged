@@ -65,6 +65,8 @@ ged/
 - **Implicit interface conformance** (no explicit `implements`)
 - **Multiple return values** for error handling
 - **`strings.Builder`** for efficient string building
+- **`io.Reader` and `io.Writer`** interfaces for testable I/O
+- **Error wrapping** with `fmt.Errorf("...: %w", err)`
 
 ### Implementation Notes
 
@@ -86,7 +88,9 @@ rule, _ := NewSubstitutionRule("foo", "bar", WithGlobal()) // with options
 
 **Escape Handling**: `splitByDelimiter()` handles `\/` and `\\` escape sequences.
 
-### Tests Written (28 total)
+**Testable CLI**: `main()` is a thin wrapper that calls `run(args, stdin, stdout, stderr)`. The `run()` function accepts `io.Reader`/`io.Writer` interfaces, allowing tests to use `strings.NewReader` and `bytes.Buffer` instead of real I/O.
+
+### Tests Written (36 total)
 - [x] SubstitutionRule replaces first match only
 - [x] SubstitutionRule handles no match (returns original)
 - [x] SubstitutionRule handles regex patterns
@@ -98,14 +102,18 @@ rule, _ := NewSubstitutionRule("foo", "bar", WithGlobal()) // with options
 - [x] Parser handles escaped backslashes
 - [x] Parser preserves whitespace
 - [x] Parser rejects invalid input
+- [x] CLI handles basic substitution end-to-end
+- [x] CLI handles multiple lines
+- [x] CLI returns errors for invalid input
 
 ### Files Created
 - `internal/rule/rule.go` - Rule interface
 - `internal/rule/line_rules.go` - SubstitutionRule with functional options
-- `internal/rule/line_rules_test.go` - Rule tests
+- `internal/rule/line_rules_test.go` - Rule tests (7 tests)
 - `internal/parser/parser.go` - ParseRule with escape handling
-- `internal/parser/parser_test.go` - Parser tests (table-driven)
-- `cmd/ged/main.go` - CLI entry point
+- `internal/parser/parser_test.go` - Parser tests, table-driven (21 tests)
+- `cmd/ged/main.go` - CLI entry point with testable `run()` function
+- `cmd/ged/main_test.go` - CLI integration tests (8 tests)
 
 ### Deliverable ✅
 ```bash
