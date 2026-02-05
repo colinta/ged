@@ -4,10 +4,20 @@ import "regexp"
 
 // SubstitutionRule replaces text matching a pattern.
 type SubstitutionRule struct {
-	pattern *regexp.Regexp
-	replace string
-	global  bool
+	patternStr string         // original pattern string
+	pattern    *regexp.Regexp // compiled regex
+	replace    string
+	global     bool
 }
+
+// Pattern returns the original pattern string.
+func (r *SubstitutionRule) Pattern() string { return r.patternStr }
+
+// Replace returns the replacement string.
+func (r *SubstitutionRule) Replace() string { return r.replace }
+
+// Global returns whether all matches are replaced.
+func (r *SubstitutionRule) Global() bool { return r.global }
 
 // SubstitutionOption configures a SubstitutionRule.
 type SubstitutionOption func(*SubstitutionRule)
@@ -21,16 +31,17 @@ func WithGlobal() SubstitutionOption {
 
 // NewSubstitutionRule creates a rule that replaces pattern matches with replacement text.
 // By default, only the first match is replaced. Use WithGlobal() to replace all matches.
-func NewSubstitutionRule(pattern, replace string, opts ...SubstitutionOption) (*SubstitutionRule, error) {
-	re, err := regexp.Compile(pattern)
+func NewSubstitutionRule(patternStr, replace string, opts ...SubstitutionOption) (*SubstitutionRule, error) {
+	patternRegex, err := regexp.Compile(patternStr)
 	if err != nil {
 		return nil, err
 	}
 
 	r := &SubstitutionRule{
-		pattern: re,
-		replace: replace,
-		global:  false,
+		patternStr: patternStr,
+		pattern:    patternRegex,
+		replace:    replace,
+		global:     false,
 	}
 
 	for _, opt := range opts {
