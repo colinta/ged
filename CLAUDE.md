@@ -4,6 +4,18 @@ This plan breaks down the ged project into incremental phases. Each phase introd
 
 You are a professional go developer and are teaching me the basics of Go by writing the 'ged' tool together. Before writing code, you should teach me about the library and concepts that we need for that section. Make sure I understand before we add more code to the project.
 
+---
+
+## Current Progress
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| 1 | ✅ Complete | Basic substitution (`s/foo/bar`) |
+| 2 | 🔲 Next | Filtering rules (`p/pattern/`, `d/pattern/`) |
+| 3-20 | 🔲 Pending | See details below |
+
+**To continue**: Run `go test ./...` to verify everything works, then start Phase 2.
+
 ## Project Structure
 
 ```
@@ -37,64 +49,77 @@ ged/
 
 ---
 
-## Phase 1: Hello Go - Basic Substitution
+## Phase 1: Hello Go - Basic Substitution ✅ COMPLETE
 
 **Goal**: Get a working `ged 's/foo/bar'` that reads stdin and writes stdout.
 
-**Go Concepts Introduced**:
+**Go Concepts Learned**:
 - Package structure and `go mod init`
 - Basic types: strings, errors
 - `fmt` and `os` packages
 - `bufio.Scanner` for line reading
 - `regexp` package
 - Writing and running tests with `go test`
+- **Functional options pattern** for configurable constructors
+- **Table-driven tests** for comprehensive test coverage
+- **Implicit interface conformance** (no explicit `implements`)
+- **Multiple return values** for error handling
+- **`strings.Builder`** for efficient string building
 
-### Steps
+### Implementation Notes
 
-1. **Initialize the project**
-   ```bash
-   mkdir ged && cd ged
-   go mod init github.com/colinta/ged
-   ```
+**Functional Options**: We use the idiomatic Go pattern for optional parameters:
+```go
+rule, _ := NewSubstitutionRule("foo", "bar")              // defaults
+rule, _ := NewSubstitutionRule("foo", "bar", WithGlobal()) // with options
+```
 
-2. **Create the Rule interface** (`internal/rule/rule.go`)
-   - Define `Rule` interface with `Apply(line string) ([]string, error)`
-   - Define `LineRule` interface (embeds `Rule`)
-   - Create `SubstitutionRule` struct with `pattern *regexp.Regexp` and `replacement string`
+**Parser Design**: Two-layer parsing:
+- `ParseRule()` - handles delimiter detection, escape sequences, dispatches to command parsers
+- `parseSubstitution()` - validates and creates SubstitutionRule
 
-3. **Write tests first** (`internal/rule/line_rules_test.go`)
-   ```go
-   func TestSubstitutionRule(t *testing.T) {
-       rule := NewSubstitutionRule("world", "earth")
-       result, _ := rule.Apply("hello world")
-       if result[0] != "hello earth" {
-           t.Errorf("got %q, want %q", result[0], "hello earth")
-       }
-   }
-   ```
+**Flexible Syntax**: Trailing delimiter is optional unless flags are needed:
+- `s/foo/bar` ✓
+- `s/foo/bar/` ✓
+- `s/foo/bar/g` ✓ (need delimiter before flags)
+- `s/foo/` ✓ (empty replacement)
 
-4. **Implement SubstitutionRule**
-   - Constructor: `NewSubstitutionRule(pattern, replace string) (*SubstitutionRule, error)`
-   - Method: `Apply(line string) ([]string, error)`
+**Escape Handling**: `splitByDelimiter()` handles `\/` and `\\` escape sequences.
 
-5. **Create minimal CLI** (`cmd/ged/main.go`)
-   - Parse first argument as `s/pattern/replace/`
-   - Read stdin line by line
-   - Apply rule, print result
+### Tests Written (28 total)
+- [x] SubstitutionRule replaces first match only
+- [x] SubstitutionRule handles no match (returns original)
+- [x] SubstitutionRule handles regex patterns
+- [x] SubstitutionRule with `WithGlobal()` replaces all matches
+- [x] SubstitutionRule handles capture group replacements ($1, $2)
+- [x] Invalid regex returns error
+- [x] Parser handles various delimiters (/, |, =, #)
+- [x] Parser handles escaped delimiters
+- [x] Parser handles escaped backslashes
+- [x] Parser preserves whitespace
+- [x] Parser rejects invalid input
 
-6. **Add GlobalSubstitutionRule** (replaces all matches)
+### Files Created
+- `internal/rule/rule.go` - Rule interface
+- `internal/rule/line_rules.go` - SubstitutionRule with functional options
+- `internal/rule/line_rules_test.go` - Rule tests
+- `internal/parser/parser.go` - ParseRule with escape handling
+- `internal/parser/parser_test.go` - Parser tests (table-driven)
+- `cmd/ged/main.go` - CLI entry point
 
-### Tests to Write
-- [ ] SubstitutionRule replaces first match only
-- [ ] SubstitutionRule handles no match (returns original)
-- [ ] SubstitutionRule handles regex patterns
-- [ ] GlobalSubstitutionRule replaces all matches
-- [ ] Case-insensitive flag works
-
-### Deliverable
+### Deliverable ✅
 ```bash
-echo "hello world" | ged 's/world/earth'
+echo "hello world" | ./ged 's/world/earth'
 # Output: hello earth
+
+echo "hello world world" | ./ged 's/world/earth'
+# Output: hello earth world  (first match only)
+
+echo "hello world world" | ./ged 's/world/earth/g'
+# Output: hello earth earth  (global)
+
+echo "foo 123 bar 456" | ./ged 's/\d+/NUM/g'
+# Output: foo NUM bar NUM
 ```
 
 ---
