@@ -28,6 +28,10 @@ func ParseRule(input string) (rule.Rule, error) {
 	switch command {
 	case 's':
 		return parseSubstitution(parts)
+	case 'p':
+		return parsePrint(parts)
+	case 'd':
+		return parseDelete(parts)
 	default:
 		return nil, fmt.Errorf("unknown command: %c", command)
 	}
@@ -102,4 +106,26 @@ func parseSubstitution(parts []string) (*rule.SubstitutionRule, error) {
 	}
 
 	return rule.NewSubstitutionRule(pattern, replace, opts...)
+}
+
+// parsePrint creates a PrintLineRule from parsed parts.
+// Expected parts: [pattern] or [pattern, ""]
+func parsePrint(parts []string) (*rule.PrintLineRule, error) {
+	if len(parts) < 1 {
+		return nil, fmt.Errorf("print requires a pattern")
+	}
+
+	pattern := parts[0]
+	return rule.NewPrintLineRule(pattern)
+}
+
+// parseDelete creates a DeleteLineRule from parsed parts.
+// Expected parts: [pattern] or [pattern, ""]
+func parseDelete(parts []string) (*rule.DeleteLineRule, error) {
+	if len(parts) < 1 {
+		return nil, fmt.Errorf("delete requires a pattern")
+	}
+
+	pattern := parts[0]
+	return rule.NewDeleteLineRule(pattern)
 }

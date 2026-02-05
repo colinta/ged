@@ -110,3 +110,63 @@ func TestRun_EmptyInput(t *testing.T) {
 		t.Errorf("expected empty output, got %q", out.String())
 	}
 }
+
+func TestRun_PrintKeepsMatchingLines(t *testing.T) {
+	in := strings.NewReader("foo\nbar\nfoo baz")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"p/foo"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "foo\nfoo baz\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_PrintWithRegex(t *testing.T) {
+	in := strings.NewReader("123\nabc\n456")
+	out := &bytes.Buffer{}
+
+	err := run([]string{`p/^\d+$`}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "123\n456\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_DeleteRemovesMatchingLines(t *testing.T) {
+	in := strings.NewReader("foo\nbar\nfoo baz")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"d/foo"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "bar\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_DeleteComments(t *testing.T) {
+	in := strings.NewReader("code\n# comment\nmore code\n  # indented comment")
+	out := &bytes.Buffer{}
+
+	err := run([]string{`d/^\s*#`}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "code\nmore code\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
