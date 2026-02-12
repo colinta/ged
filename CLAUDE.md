@@ -16,7 +16,8 @@ You are a professional go developer and are teaching me the basics of Go by writ
 | 4 | ✅ Complete | Line numbers (`p:1-5`, `d:2-4`, `s:1-3:replacement`) |
 | 5 | ✅ Complete | Literal string matching (backtick/quote delimiters) |
 | 6 | ✅ Complete | Document rules (`sort`, `reverse`, `join`) |
-| 7-20 | 🔲 Pending | See details below |
+| 7 | ✅ Complete | Conditional rules (`if/pattern/ { rules }`) |
+| 8-20 | 🔲 Pending | See details below |
 
 **To continue**: Run `go test ./...` to verify everything works, then start Phase 7.
 
@@ -392,49 +393,88 @@ echo -e "c3\na1\nb2" | ged 's/[0-9]//g' sort
 
 ---
 
-## Phase 7: Conditional Rules
+## Phase 7: Conditional Rules ✅ COMPLETE
 
 **Goal**: Implement `if/pattern/ { rules }`
 
-**Go Concepts Introduced**:
-- Recursive parsing
-- Tree structures
-- Nested rule execution
-- Boolean logic
+**Go Concepts Learned**:
+- **Recursive parsing**: `parseArgs` calls itself to handle nested `{ }` blocks
+- **Intermediate types**: `condition` is a parser-internal type that bridges parsing and rule creation
+- **Tree structures**: `ConditionalLineRule` contains child rules, forming a tree instead of a flat list
+- **`make([]bool, n)`**: Pre-allocated boolean slice for tracking match positions
 
-### Steps
+### Implementation Notes
 
-1. **Extend parser for block syntax**
-   - Detect `{` and `}` tokens
-   - Parse nested rules recursively
+**Two Conditional Rule Types**:
+- `ConditionalLineRule` (implements `LineRule`) — all inner rules are `LineRule`s, can stream line-by-line
+- `ConditionalDocRule` (implements `DocumentRule`) — inner rules include `DocumentRule`s, buffers matching lines into a sub-document
 
-2. **Create ConditionalRule wrapper**
-   ```go
-   type ConditionalRule struct {
-       condition *regexp.Regexp
-       inverted  bool
-       rules     []Rule
-   }
-   ```
+The parser decides which to create based on what's inside the block.
 
-3. **Implement condition types**:
-   - `if/pattern/` - apply rules to matching lines
-   - `!if/pattern/` - apply rules to non-matching lines
-
-4. **Handle condition chaining**
-   - `if/foo/ if/bar/ { ... }` - both must match
-
-### Tests to Write
-- [ ] If condition applies rules to matches only
-- [ ] Inverted if applies to non-matches
-- [ ] Non-matching lines pass through unchanged
-- [ ] Nested rules execute in order
-- [ ] Chained conditions require all to match
-
-### Deliverable
+**Syntax**: Each token is a separate CLI argument:
 ```bash
-echo -e "hello\nworld\nhello" | ged 'if/hello/ { s/o/x }'
+ged 'if/hello/' '{' 's/o/x/' '}'
+ged '!if/hello/' '{' 's/o/x/' '}'      # inverted
+ged 'if/foo/' '{' 'if/bar/' '{' 's/x/y/' '}' '}'  # nested
+ged 'if/item/' '{' 'sort' '}'           # document rule inside block
+```
+
+**ParseArgs**: New top-level parser function that handles multi-arg block syntax. Replaces the per-arg loop in `main.go`. Uses recursion to handle nested blocks.
+
+**ConditionalDocRule semantics**: Matching lines are collected into a sub-document, inner rules are applied, then results are woven back into their original positions. Non-matching lines stay in place as fixed anchors.
+
+**buildDocRules helper**: Converts mixed `[]any` into `[]DocumentRule` by wrapping consecutive `LineRule`s in `ApplyAllRule`. Same logic as `main.go`'s rule grouping.
+
+### Tests Written
+- [x] If condition applies rules to matches only
+- [x] Inverted if applies to non-matches
+- [x] Non-matching lines pass through unchanged
+- [x] Multiple inner rules chain as pipeline
+- [x] Inner delete removes line entirely
+- [x] Line numbers passed through to inner rules
+- [x] ConditionalDocRule sorts only matching lines
+- [x] ConditionalDocRule reverses only matching lines
+- [x] ConditionalDocRule joins matching lines
+- [x] ConditionalDocRule inverted works
+- [x] ConditionalDocRule no matches passes through
+- [x] ConditionalDocRule mixed line+doc inner rules
+- [x] Parser: if/pattern/ returns condition
+- [x] Parser: !if/pattern/ returns inverted condition
+- [x] Parser: literal delimiters work with if
+- [x] Parser: missing pattern errors
+- [x] ParseArgs: simple rules without conditionals
+- [x] ParseArgs: conditional block creates LineRule
+- [x] ParseArgs: document rule inside block creates DocRule
+- [x] ParseArgs: nested conditionals
+- [x] ParseArgs: error on missing braces
+- [x] CLI: if condition end-to-end
+- [x] CLI: inverted if end-to-end
+- [x] CLI: if with multiple inner rules
+- [x] CLI: if then sort
+- [x] CLI: if with document rule inside block
+- [x] CLI: nested if (chained conditions)
+
+### Files Created
+- `internal/rule/conditional_rule.go` - ConditionalLineRule and ConditionalDocRule
+- `internal/rule/conditional_rule_test.go` - Tests
+- `internal/parser/parse_args.go` - ParseArgs with recursive block parsing
+- `internal/parser/parse_args_test.go` - Tests
+
+### Files Modified
+- `internal/parser/parser.go` - Added `parseIf()`, `condition` type, `if`/`!if` dispatch
+- `cmd/ged/main.go` - Uses `ParseArgs()` instead of per-arg loop
+- `cmd/ged/main_test.go` - CLI integration tests for conditionals
+
+### Deliverable ✅
+```bash
+echo -e "hello\nworld\nhello" | ged 'if/hello/' '{' 's/o/x/' '}'
 # Output: hellx\nworld\nhellx
+
+echo -e "hello\nworld\nhello" | ged '!if/hello/' '{' 's/o/x/' '}'
+# Output: hello\nwxrld\nhello
+
+echo -e "b_item\na_item\nc_other\nd_item" | ged 'if/item/' '{' sort '}'
+# Output: a_item\nb_item\nc_other\nd_item
 ```
 
 ---

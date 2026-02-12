@@ -311,3 +311,101 @@ func TestRun_JoinBare(t *testing.T) {
 		t.Errorf("got %q, want %q", out.String(), want)
 	}
 }
+
+func TestRun_IfCondition(t *testing.T) {
+	in := strings.NewReader("hello\nworld\nhello world")
+	out := &bytes.Buffer{}
+
+	// Only substitute on lines containing "hello"
+	err := run([]string{"if/hello/", "{", "s/o/x/", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "hellx\nworld\nhellx world\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_IfConditionInverted(t *testing.T) {
+	in := strings.NewReader("hello\nworld\nhello world")
+	out := &bytes.Buffer{}
+
+	// Substitute on lines NOT containing "hello"
+	err := run([]string{"!if/hello/", "{", "s/o/x/", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "hello\nwxrld\nhello world\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_IfWithMultipleInnerRules(t *testing.T) {
+	in := strings.NewReader("hello\nworld\nhello world")
+	out := &bytes.Buffer{}
+
+	// On "hello" lines: replace "h" then "e"
+	err := run([]string{"if/hello/", "{", "s/h/H/", "s/e/E/", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "HEllo\nworld\nHEllo world\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_IfThenSort(t *testing.T) {
+	in := strings.NewReader("b_hello\na_hello\nc_world")
+	out := &bytes.Buffer{}
+
+	// Conditional then sort — conditional is a LineRule, sort is DocumentRule
+	err := run([]string{"if/hello/", "{", "s/_hello//", "}", "sort"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "a\nb\nc_world\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_IfWithDocumentRule(t *testing.T) {
+	in := strings.NewReader("b_item\na_item\nc_other\nd_item")
+	out := &bytes.Buffer{}
+
+	// Sort only lines matching "item"
+	err := run([]string{"if/item/", "{", "sort", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// items sorted: a_item, b_item, d_item woven back into positions 0,1,3
+	// c_other stays at position 2
+	want := "a_item\nb_item\nc_other\nd_item\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_NestedIf(t *testing.T) {
+	in := strings.NewReader("ab\nac\nbd\nbc")
+	out := &bytes.Buffer{}
+
+	// Nested: only apply to lines with "a" AND "b"
+	err := run([]string{"if/a/", "{", "if/b/", "{", "s/ab/AB/", "}", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "AB\nac\nbd\nbc\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}

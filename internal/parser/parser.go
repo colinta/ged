@@ -24,6 +24,9 @@ func ParseRule(input string) (any, error) {
 	if strings.HasPrefix(input, "join") {
 		return parseJoin(input)
 	}
+	if strings.HasPrefix(input, "!if") || strings.HasPrefix(input, "if") {
+		return parseIf(input)
+	}
 
 	if len(input) < 2 {
 		return nil, fmt.Errorf("invalid rule: too short")
@@ -221,4 +224,54 @@ func parseDeleteLineNum(parts []string) (rule.LineRule, error) {
 		return nil, fmt.Errorf("invalid line range: %w", err)
 	}
 	return rule.NewDeleteLineNumRule(lineRange), nil
+}
+
+// condition is a parser-internal type representing a parsed if/!if condition.
+// It's not a rule — it gets converted into a ConditionalRule once the inner
+// rules are collected from the { } block.
+type condition struct {
+	pattern  *regexp.Regexp
+	inverted bool
+}
+
+// parseIf parses "if/pattern/" or "!if/pattern/" and returns a condition.
+func parseIf(input string) (*condition, error) {
+	inverted := false
+	rest := input
+
+	if strings.HasPrefix(rest, "!if") {
+		inverted = true
+		rest = rest[3:]
+	} else {
+		rest = rest[2:]
+	}
+
+	if len(rest) == 0 {
+		return nil, fmt.Errorf("missing pattern in if condition")
+	}
+
+	delimiter := rest[0]
+	parts, err := splitByDelimiter(rest[1:], delimiter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parts) < 1 || parts[0] == "" {
+		return nil, fmt.Errorf("missing pattern in if condition")
+	}
+
+	pattern := parts[0]
+	if delimiter == '`' || delimiter == '\'' || delimiter == '"' {
+		pattern = regexp.QuoteMeta(pattern)
+	}
+
+	compiled, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pattern in if condition: %w", err)
+	}
+
+	return &condition{
+		pattern:  compiled,
+		inverted: inverted,
+	}, nil
 }

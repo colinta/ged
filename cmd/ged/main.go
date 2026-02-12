@@ -25,17 +25,18 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		return fmt.Errorf("usage: ged <rule> [rule...]")
 	}
 
-	// Parse all rules and build a list of DocumentRules.
+	// Parse all rules, handling { } blocks for conditionals.
+	allParsed, err := parser.ParseArgs(args)
+	if err != nil {
+		return fmt.Errorf("error parsing rules: %w", err)
+	}
+
+	// Build a list of DocumentRules.
 	// Consecutive LineRules are wrapped in an ApplyAllRule.
 	var docRules []rule.DocumentRule
 	var pendingLineRules []rule.LineRule
 
-	for _, ruleStr := range args {
-		parsed, err := parser.ParseRule(ruleStr)
-		if err != nil {
-			return fmt.Errorf("error parsing rule %q: %w", ruleStr, err)
-		}
-
+	for _, parsed := range allParsed {
 		switch r := parsed.(type) {
 		case rule.LineRule:
 			pendingLineRules = append(pendingLineRules, r)
