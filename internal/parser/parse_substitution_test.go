@@ -44,6 +44,16 @@ func TestParseRule_Substitution(t *testing.T) {
 		{"escaped backslash", `s/foo\\bar/baz/`, `foo\bar`, "baz", false, false},
 		// Whitespace preserved
 		{"whitespace preserved", "s/ foo / bar /", " foo ", " bar ", false, false},
+		// Literal matching (quote delimiters)
+		{"backtick literal dot", "s`foo.bar`baz`", `foo\.bar`, "baz", false, false},
+		{"backtick literal star", "s`a*b`c`", `a\*b`, "c", false, false},
+		{"backtick no metacharacters", "s`foo`bar`", "foo", "bar", false, false},
+		{"single quote literal dot", "s'foo.bar'baz'", `foo\.bar`, "baz", false, false},
+		{"double quote literal dot", `s"foo.bar"baz"`, `foo\.bar`, "baz", false, false},
+		// Escape sequences
+		{"newline in replacement", `s/foo/bar\nbaz/`, "foo", "bar\nbaz", false, false},
+		{"tab in replacement", `s/foo/bar\tbaz/`, "foo", "bar\tbaz", false, false},
+		{"newline in pattern", `s/foo\nbar/baz/`, "foo\nbar", "baz", false, false},
 		// Errors
 		{"too short", "s/", "", "", false, true},
 		{"missing replacement", "s/foo", "", "", false, true},
@@ -79,6 +89,45 @@ func TestParseRule_Substitution(t *testing.T) {
 			}
 			if sub.Global() != tt.wantGlobal {
 				t.Errorf("global: got %v, want %v", sub.Global(), tt.wantGlobal)
+			}
+		})
+	}
+}
+
+func TestParseRule_SubstitutionLineNum(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"single line", "s:5:replaced", false},
+		{"range", "s:2-4:new content", false},
+		{"open from", "s:5-:replaced", false},
+		{"open to", "s:-5:replaced", false},
+		{"composite", "s:1,3,5-7:replaced", false},
+		{"empty replacement", "s:2:", false},
+		{"invalid range", "s:abc:replaced", true},
+		{"missing replacement", "s:5", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, err := ParseRule(tt.input)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			_, ok := r.(*rule.SubLineNumRule)
+			if !ok {
+				t.Fatalf("expected *SubLineNumRule, got %T", r)
 			}
 		})
 	}

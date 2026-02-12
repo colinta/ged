@@ -11,10 +11,14 @@ You are a professional go developer and are teaching me the basics of Go by writ
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 1 | ✅ Complete | Basic substitution (`s/foo/bar`) |
-| 2 | 🔲 Next | Filtering rules (`p/pattern/`, `d/pattern/`) |
-| 3-20 | 🔲 Pending | See details below |
+| 2 | ✅ Complete | Filtering rules (`p/pattern/`, `d/pattern/`) |
+| 3 | ✅ Complete | Rule chaining (multiple rules) |
+| 4 | ✅ Complete | Line numbers (`p:1-5`, `d:2-4`, `s:1-3:replacement`) |
+| 5 | ✅ Complete | Literal string matching (backtick/quote delimiters) |
+| 6 | ✅ Complete | Document rules (`sort`, `reverse`, `join`) |
+| 7-20 | 🔲 Pending | See details below |
 
-**To continue**: Run `go test ./...` to verify everything works, then start Phase 2.
+**To continue**: Run `go test ./...` to verify everything works, then start Phase 7.
 
 ## Project Structure
 
@@ -22,29 +26,31 @@ You are a professional go developer and are teaching me the basics of Go by writ
 ged/
 ├── cmd/
 │   └── ged/
-│       └── main.go          # CLI entry point
+│       ├── main.go              # CLI entry point
+│       └── main_test.go         # CLI integration tests
 ├── internal/
 │   ├── rule/
-│   │   ├── rule.go          # Rule interface and base types
-│   │   ├── line_rules.go    # Line-based rules
-│   │   ├── doc_rules.go     # Document-based rules
-│   │   ├── conditional.go   # Conditional wrappers
-│   │   └── *_test.go        # Tests for each
+│   │   ├── rule.go              # LineRule and DocumentRule interfaces
+│   │   ├── sub_line_rule.go     # SubstitutionRule (pattern-based)
+│   │   ├── sub_linenum_rule.go  # SubLineNumRule (line number-based)
+│   │   ├── print_line_rule.go   # PrintLineRule (pattern-based)
+│   │   ├── delete_line_rule.go  # DeleteLineRule (pattern-based)
+│   │   ├── print_linenum_rule.go # PrintLineNumRule (line number-based)
+│   │   ├── delete_linenum_rule.go # DeleteLineNumRule (line number-based)
+│   │   ├── linerange.go         # LineRange types for line number parsing
+│   │   ├── sort_rule.go         # SortRule (document rule)
+│   │   ├── reverse_rule.go      # ReverseRule (document rule)
+│   │   ├── join_rule.go         # JoinRule (document rule)
+│   │   ├── apply_all_rule.go    # ApplyAllRule (wraps LineRules into DocumentRule)
+│   │   └── *_test.go            # Tests for each
 │   ├── parser/
-│   │   ├── parser.go        # Rule parsing
-│   │   ├── delimiter.go     # Delimiter handling
-│   │   ├── linerange.go     # Line number parsing
+│   │   ├── parser.go            # Rule parsing
 │   │   └── *_test.go
-│   ├── engine/
-│   │   ├── engine.go        # Processing pipeline
-│   │   ├── stream.go        # Line streaming
-│   │   └── *_test.go
-│   └── cli/
-│       ├── cli.go           # Argument parsing
-│       └── cli_test.go
+│   └── engine/
+│       ├── pipeline.go          # Processing pipeline
+│       └── pipeline_test.go
 ├── go.mod
-├── go.sum
-└── Makefile
+└── go.sum
 ```
 
 ---
@@ -132,43 +138,29 @@ echo "foo 123 bar 456" | ./ged 's/\d+/NUM/g'
 
 ---
 
-## Phase 2: Filtering Rules
+## Phase 2: Filtering Rules ✅ COMPLETE
 
 **Goal**: Implement `p/pattern/` (print matching) and `d/pattern/` (delete matching).
 
-**Go Concepts Introduced**:
-- Multiple return values
-- Empty slice vs nil semantics
-- Table-driven tests
-- Error handling patterns
+**Go Concepts Learned**:
+- **Empty slice vs nil semantics**: `[]string{}` signals "delete line", slice with content keeps line(s)
+- Separate files per rule type for better organization
 
-### Steps
+### Implementation Notes
 
-1. **Extend the Rule interface**
-   - Returning empty slice `[]string{}` means "delete this line"
-   - Returning `nil` means "keep original unchanged"
+- `PrintLineRule` - keeps lines matching pattern, deletes non-matching
+- `DeleteLineRule` - deletes lines matching pattern, keeps non-matching
+- Parser extended with `parsePrint()` and `parseDelete()` functions
 
-2. **Implement PrintLineRule** (`p/pattern/`)
-   - Match: return `[]string{line}`
-   - No match: return `[]string{}`
+### Tests Written
+- [x] PrintLineRule keeps matching lines
+- [x] PrintLineRule removes non-matching lines
+- [x] DeleteLineRule removes matching lines
+- [x] DeleteLineRule keeps non-matching lines
+- [x] Regex patterns work in both rules
+- [x] Different delimiters parse correctly
 
-3. **Implement DeleteLineRule** (`d/pattern/`)
-   - Match: return `[]string{}`
-   - No match: return `[]string{line}`
-
-4. **Refactor parsing**
-   - Extract delimiter parsing to `internal/parser/delimiter.go`
-   - Support `/`, `|`, `=` delimiters
-
-### Tests to Write
-- [ ] PrintLineRule keeps matching lines
-- [ ] PrintLineRule removes non-matching lines
-- [ ] DeleteLineRule removes matching lines
-- [ ] DeleteLineRule keeps non-matching lines
-- [ ] Regex patterns work in both rules
-- [ ] Different delimiters parse correctly
-
-### Deliverable
+### Deliverable ✅
 ```bash
 echo -e "foo\nbar\nfoo" | ged 'p/foo/'
 # Output: foo\nfoo
@@ -179,42 +171,30 @@ echo -e "foo\nbar\nfoo" | ged 'd/foo/'
 
 ---
 
-## Phase 3: Rule Chaining
+## Phase 3: Rule Chaining ✅ COMPLETE
 
 **Goal**: Support multiple rules: `ged 'p/foo/' 's/o/x/'`
 
-**Go Concepts Introduced**:
-- Slices and iteration
-- Variadic functions
-- Method chaining patterns
-- Interface composition
+**Go Concepts Learned**:
+- **Slices**: Dynamic arrays with `append()` - always reassign result
+- **Variadic functions**: `func NewPipeline(rules ...Rule)` accepts any number of arguments
+- **Spread operator**: `rules...` to pass a slice as variadic arguments
 
-### Steps
+### Implementation Notes
 
-1. **Create Pipeline type** (`internal/engine/engine.go`)
-   ```go
-   type Pipeline struct {
-       rules []rule.Rule
-   }
+- `Pipeline` type chains multiple rules together
+- Each rule's output feeds into the next rule
+- Empty output stops the chain (for filtering)
+- CLI updated to parse multiple rule arguments
 
-   func (p *Pipeline) Process(line string) []string
-   ```
+### Tests Written
+- [x] Two rules chain correctly
+- [x] Filter then substitute works
+- [x] Substitute then filter works
+- [x] Empty output stops the chain
+- [x] Delete rule in chain works
 
-2. **Handle rule output propagation**
-   - A rule can output 0, 1, or many lines
-   - Each output line feeds into the next rule
-   - Empty output stops processing for that line
-
-3. **Update CLI to accept multiple rules**
-
-### Tests to Write
-- [ ] Two rules chain correctly
-- [ ] Filter then substitute works
-- [ ] Substitute then filter works
-- [ ] Empty output stops the chain
-- [ ] Multiple output lines all get proceged
-
-### Deliverable
+### Deliverable ✅
 ```bash
 echo -e "hello\nworld\nhello" | ged 'p/hello/' 's/o/x/'
 # Output: hellx\nhellx
@@ -222,138 +202,191 @@ echo -e "hello\nworld\nhello" | ged 'p/hello/' 's/o/x/'
 
 ---
 
-## Phase 4: Line Numbers
+## Phase 4: Line Numbers ✅ COMPLETE
 
-**Goal**: Support line number operations: `p:1-5`, `s:2:replacement`
+**Goal**: Support line number operations: `p:1-5`, `d:2-4`
 
-**Go Concepts Introduced**:
-- Custom types and methods
-- Parsing with `strconv`
-- Closures (for line range test functions)
-- State in structs
+**Go Concepts Learned**:
+- **Custom types with methods**: `type SingleLine int` with `Contains(lineNum int) bool`
+- **Parsing with `strconv`**: `strconv.Atoi()` for string-to-int conversion
+- **Interface polymorphism**: `LineRange` interface with multiple implementations
+- **Breaking change management**: Updated `Rule.Apply()` signature to include `lineNum`
 
-### Steps
+### Implementation Notes
 
-1. **Create LineRange type** (`internal/parser/linerange.go`)
-   ```go
-   type LineRange interface {
-       Contains(lineNum int) bool
-   }
-   ```
+**Rule Interface Change**: All rules now receive line number:
+```go
+type Rule interface {
+    Apply(line string, lineNum int) ([]string, error)
+}
+```
 
-2. **Implement range types**:
-   - `SingleLine` - matches one line
-   - `Range` - matches start to end
-   - `OpenRange` - matches from N or to N
-   - `Modulo` - matches every Nth line
-   - `CompositeRange` - combines multiple ranges
+**LineRange Types** (in `internal/rule/linerange.go`):
+- `SingleLine` - matches one line: `5`
+- `Range` - matches range: `2-4`
+- `OpenRange` - matches open-ended: `5-` or `-5`
+- `CompositeRange` - combines with OR: `1,3,5-7`
 
-3. **Add line number tracking to Pipeline**
-   - Track current line number
-   - Pass to rules that need it
+**Colon Delimiter**: `:` indicates line number rules vs `/` for pattern rules:
+- `p:2-4` → PrintLineNumRule (lines 2, 3, 4)
+- `d:2-4` → DeleteLineNumRule (remove lines 2, 3, 4)
+- `s:2-4:text` → SubLineNumRule (replace lines 2, 3, 4 with "text")
+- `p/foo/` → PrintLineRule (pattern match)
 
-4. **Implement line-number-aware rules**
-   - `PrintLineNumRule` - print by line number
-   - `SubstituteLineRule` - replace entire line by number
+**Parser Refactor**: `ParseRule` uses `if/else if` with compound conditions to dispatch based on both command and delimiter. Specific cases (e.g. `command == 'p' && delimiter == ':'`) come before general cases (e.g. `command == 'p'`). Parse functions no longer receive the delimiter parameter.
 
-### Tests to Write
-- [ ] Single line number matches correctly
-- [ ] Range `2-4` matches lines 2, 3, 4
-- [ ] Open range `5-` matches 5 and beyond
-- [ ] Open range `-5` matches 1 through 5
-- [ ] Modulo `%2` matches even lines
-- [ ] Modulo with offset `%2-1` works
-- [ ] Comma-separated ranges work
-- [ ] Line substitution replaces entire line
+### Tests Written
+- [x] Single line number matches correctly
+- [x] Range `2-4` matches lines 2, 3, 4
+- [x] Open range `5-` matches 5 and beyond
+- [x] Open range `-5` matches 1 through 5
+- [x] Comma-separated ranges work
+- [x] PrintLineNumRule filters by line number
+- [x] DeleteLineNumRule filters by line number
+- [x] SubLineNumRule replaces matching lines
+- [x] SubLineNumRule keeps non-matching lines
+- [x] SubLineNumRule with newline in replacement returns multiple lines
 
-### Deliverable
+### Deliverable ✅
 ```bash
 echo -e "1\n2\n3\n4\n5" | ged 'p:2-4'
 # Output: 2\n3\n4
+
+echo -e "one\ntwo\nthree" | ged 's:2:replaced'
+# Output: one\nreplaced\nthree
 ```
 
 ---
 
-## Phase 5: Literal String Matching
+## Phase 5: Literal String Matching ✅ COMPLETE
 
-**Goal**: Support backtick/quote delimiters for literal matching
+**Goal**: Support quote delimiters for literal matching
 
-**Go Concepts Introduced**:
-- `strings` package functions
-- `regexp.QuoteMeta`
-- Delimiter type system
+**Go Concepts Learned**:
+- **`regexp.QuoteMeta`**: Escapes all regex metacharacters in a string
+- **Escape sequences in `splitByDelimiter`**: `\n` → newline, `\t` → tab
+- **`strings.Split`**: Splitting substitution results on newlines to produce multiple output lines
 
-### Steps
+### Implementation Notes
 
-1. **Extend delimiter parser**
-   - Track delimiter type (regex vs literal)
-   - Return metadata with parsed result
+**Literal Matching**: When the delimiter is a quote character (`` ` ``, `'`, `"`), the pattern is run through `regexp.QuoteMeta` before being compiled as a regex. This happens centrally in `ParseRule` before dispatching to parse functions.
 
-2. **Modify rule constructors**
-   - Accept flag for literal vs regex
-   - Use `strings.Replace` for literal, `regexp` for regex
+**Escape Sequences**: `splitByDelimiter` now expands `\n` and `\t` in addition to `\\` and escaped delimiters. This works in both patterns and replacements.
 
-3. **Implement escape sequence handling**
-   - `\n` → newline
-   - `\t` → tab
-   - `\\` → backslash
+**Newline in Replacements**: `SubstitutionRule.Apply` and `SubLineNumRule.Apply` split results on `\n` and return multiple entries, so a replacement containing `\n` produces multiple output lines.
 
-### Tests to Write
-- [ ] Backtick treats `.` as literal dot
-- [ ] Single quote treats `*` as literal asterisk
-- [ ] Escape sequences expand correctly
-- [ ] Mixed literal and regex rules work together
+### Tests Written
+- [x] Backtick treats `.` as literal dot
+- [x] Backtick treats `[` `]` as literal brackets
+- [x] Single quote activates literal matching
+- [x] Double quote activates literal matching
+- [x] Escape sequences expand correctly (`\n`, `\t`)
+- [x] Newline in substitution replacement produces multiple output lines
+- [x] QuoteMeta'd pattern matches literal but not regex wildcards
 
-### Deliverable
+### Deliverable ✅
 ```bash
-echo "foo.bar" | ged 's`foo.bar`baz'
+echo "foo.bar" | ged 's`foo.bar`baz`'
 # Output: baz  (literal match, not regex)
+
+echo "foo.bar" | ged "s'foo.bar'baz'"
+# Output: baz
+
+echo "hello" | ged 's/hello/line1\nline2/'
+# Output: line1
+#         line2
 ```
 
 ---
 
-## Phase 6: Document Rules
+## Phase 6: Document Rules ✅ COMPLETE
 
 **Goal**: Implement `sort`, `reverse`, `join`
 
-**Go Concepts Introduced**:
-- `sort` package
-- Slices manipulation
-- `strings.Join`
-- Interface type assertions
-- Buffering strategies
+**Go Concepts Learned**:
+- **`sort.Strings`**: Sorts a string slice in place — always copy first to avoid mutating the caller's data
+- **`slices.Reverse`**: Reverses a slice in place (Go 1.21+, `slices` package)
+- **`strings.Join`**: Joins slice elements with a separator string
+- **Type switches**: `switch r := parsed.(type) { case X: ... }` dispatches on runtime type
+- **`any` type**: Alias for `interface{}`, used when a function returns different interface types
+- **Circular import avoidance**: Go forbids circular imports; `ApplyAllRule` inlines pipeline logic to avoid `rule` importing `engine`
 
-### Steps
+### Implementation Notes
 
-1. **Define DocumentRule interface**
-   ```go
-   type DocumentRule interface {
-       ApplyDocument(lines []string) ([]string, error)
-   }
-   ```
+**Architecture Change**: Renamed `Rule` to `LineRule` (per-line processing) and added `DocumentRule` (whole-document processing). The rename is transparent to existing code because Go uses implicit interface conformance.
 
-2. **Modify Pipeline to detect document rules**
-   - If any document rule exists, buffer all line output
-   - Apply document rules to buffer
+**Two Interfaces**:
+```go
+type LineRule interface {
+    Apply(line string, lineNum int) ([]string, error)
+}
+type DocumentRule interface {
+    ApplyDocument(lines []string) ([]string, error)
+}
+```
 
-3. **Implement document rules**:
-   - `SortRule` - alphabetic sort
-   - `SortNumericRule` - numeric sort
-   - `ReverseRule` - reverse order
-   - `JoinRule` - join with separator
+**Parser Returns `any`**: `ParseRule` now returns `(any, error)` because it can produce either a `LineRule` or a `DocumentRule`. Word commands (`sort`, `reverse`, `join`) are checked *before* single-character command dispatch, since `sort` starts with `s` and would otherwise match the substitution command.
 
-### Tests to Write
-- [ ] Sort orders alphabetically
-- [ ] SortNumeric handles numbers correctly
-- [ ] SortNumeric handles non-numeric lines
-- [ ] Reverse reverses line order
-- [ ] Join combines lines with separator
-- [ ] Line rules then document rules work
-- [ ] Document rules then line rules work
+**ApplyAllRule**: Wraps consecutive `LineRule`s into a `DocumentRule` by inlining the pipeline chaining logic. This avoids a circular import between `rule` and `engine`.
 
-### Deliverable
+**main.go Rewrite**: `run()` now:
+1. Parses all args, building a `[]DocumentRule` list
+2. Consecutive `LineRule`s are wrapped in `ApplyAllRule`
+3. All stdin is buffered into `[]string`
+4. Each `DocumentRule` is applied in sequence
+5. Output is written
+
+### Tests Written
+- [x] Sort orders alphabetically
+- [x] Sort handles empty/single-line input
+- [x] Sort does not mutate input slice
+- [x] Reverse reverses line order
+- [x] Reverse handles empty/single-line input
+- [x] Reverse does not mutate input slice
+- [x] Join combines lines with comma
+- [x] Join combines lines with space
+- [x] Join combines lines with empty separator
+- [x] Join handles empty/single-line input
+- [x] ApplyAllRule applies substitution to all lines
+- [x] ApplyAllRule filters lines
+- [x] ApplyAllRule chains multiple rules
+- [x] ApplyAllRule preserves line numbering
+- [x] Parser parses `sort`, `reverse`, `join`, `join/,/`
+- [x] `sort` does not match as substitution command
+- [x] CLI: sort, reverse, join end-to-end
+- [x] CLI: line rules then sort
+- [x] CLI: sort then line rules
+- [x] CLI: bare join (empty separator)
+
+### Files Created
+- `internal/rule/sort_rule.go` - SortRule (DocumentRule)
+- `internal/rule/reverse_rule.go` - ReverseRule (DocumentRule)
+- `internal/rule/join_rule.go` - JoinRule (DocumentRule)
+- `internal/rule/apply_all_rule.go` - ApplyAllRule (wraps LineRules into DocumentRule)
+- `internal/rule/sort_rule_test.go` - Tests
+- `internal/rule/reverse_rule_test.go` - Tests
+- `internal/rule/join_rule_test.go` - Tests
+- `internal/rule/apply_all_rule_test.go` - Tests
+- `internal/parser/parse_document_test.go` - Tests
+
+### Files Modified
+- `internal/rule/rule.go` - Renamed `Rule` to `LineRule`, added `DocumentRule`
+- `internal/engine/pipeline.go` - `rule.Rule` → `rule.LineRule`
+- `internal/parser/parser.go` - Returns `any`, word command dispatch, helper return types
+- `cmd/ged/main.go` - Rewritten for document-rule architecture
+
+### Deliverable ✅
 ```bash
-echo -e "c\na\nb" | ged 'sort'
+echo -e "c\na\nb" | ged sort
+# Output: a\nb\nc
+
+echo -e "a\nb\nc" | ged reverse
+# Output: c\nb\na
+
+echo -e "a\nb\nc" | ged 'join/,/'
+# Output: a,b,c
+
+echo -e "c3\na1\nb2" | ged 's/[0-9]//g' sort
 # Output: a\nb\nc
 ```
 

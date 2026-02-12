@@ -3,6 +3,7 @@ package parser
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/colinta/ged/internal/rule"
@@ -10,7 +11,20 @@ import (
 
 // ParseRule parses a rule string and returns the appropriate Rule.
 // It handles delimiter detection and dispatches to command-specific parsers.
-func ParseRule(input string) (rule.Rule, error) {
+// Returns either a rule.LineRule or rule.DocumentRule (as any).
+func ParseRule(input string) (any, error) {
+	// Word commands must be checked first — "sort" starts with 's',
+	// which would otherwise match the substitution command.
+	if input == "sort" {
+		return rule.NewSortRule(), nil
+	}
+	if input == "reverse" {
+		return rule.NewReverseRule(), nil
+	}
+	if strings.HasPrefix(input, "join") {
+		return parseJoin(input)
+	}
+
 	if len(input) < 2 {
 		return nil, fmt.Errorf("invalid rule: too short")
 	}
@@ -25,16 +39,51 @@ func ParseRule(input string) (rule.Rule, error) {
 		return nil, err
 	}
 
-	switch command {
-	case 's':
-		return parseSubstitution(parts)
-	case 'p':
+	// Quote delimiters mean literal matching — escape regex metacharacters
+	if (delimiter == '`' || delimiter == '\'' || delimiter == '"') && len(parts) > 0 {
+		parts[0] = regexp.QuoteMeta(parts[0])
+	}
+
+	if command == 'p' && delimiter == ':' {
+		return parsePrintLineNum(parts)
+	} else if command == 'p' {
 		return parsePrint(parts)
-	case 'd':
+	} else if command == 'd' && delimiter == ':' {
+		return parseDeleteLineNum(parts)
+	} else if command == 'd' {
 		return parseDelete(parts)
-	default:
+	} else if command == 's' && delimiter == ':' {
+		return parseSubstitutionLineNum(parts)
+	} else if command == 's' {
+		return parseSubstitution(parts)
+	} else {
 		return nil, fmt.Errorf("unknown command: %c", command)
 	}
+}
+
+// parseJoin handles "join" (bare) and "join/sep/" syntax.
+func parseJoin(input string) (*rule.JoinRule, error) {
+	if input == "join" {
+		return rule.NewJoinRule(""), nil
+	}
+
+	if len(input) < 5 {
+		return nil, fmt.Errorf("invalid join syntax: %q", input)
+	}
+
+	delimiter := input[4]
+	rest := input[5:]
+
+	parts, err := splitByDelimiter(rest, delimiter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parts) < 1 {
+		return nil, fmt.Errorf("join requires a separator")
+	}
+
+	return rule.NewJoinRule(parts[0]), nil
 }
 
 // splitByDelimiter splits a string by delimiter, respecting backslash escapes.
@@ -58,6 +107,14 @@ func splitByDelimiter(input string, delimiter byte) ([]string, error) {
 			} else if next == '\\' {
 				// Escaped backslash - write single backslash
 				current.WriteByte('\\')
+				i += 2
+				continue
+			} else if next == 'n' {
+				current.WriteByte('\n')
+				i += 2
+				continue
+			} else if next == 't' {
+				current.WriteByte('\t')
 				i += 2
 				continue
 			}
@@ -108,24 +165,60 @@ func parseSubstitution(parts []string) (*rule.SubstitutionRule, error) {
 	return rule.NewSubstitutionRule(pattern, replace, opts...)
 }
 
-// parsePrint creates a PrintLineRule from parsed parts.
-// Expected parts: [pattern] or [pattern, ""]
-func parsePrint(parts []string) (*rule.PrintLineRule, error) {
+// parseSubstitutionLineNum creates a SubLineNumRule for line number replacement.
+// Expected parts: [lineRange, replacement]
+func parseSubstitutionLineNum(parts []string) (rule.LineRule, error) {
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("substitution requires a line range and replacement")
+	}
+
+	lineRange, err := rule.ParseLineRange(parts[0])
+	if err != nil {
+		return nil, fmt.Errorf("invalid line range: %w", err)
+	}
+	return rule.NewSubLineNumRule(lineRange, parts[1]), nil
+}
+
+// parsePrint creates a PrintLineRule for pattern matching.
+func parsePrint(parts []string) (rule.LineRule, error) {
 	if len(parts) < 1 {
 		return nil, fmt.Errorf("print requires a pattern")
 	}
 
-	pattern := parts[0]
-	return rule.NewPrintLineRule(pattern)
+	return rule.NewPrintLineRule(parts[0])
 }
 
-// parseDelete creates a DeleteLineRule from parsed parts.
-// Expected parts: [pattern] or [pattern, ""]
-func parseDelete(parts []string) (*rule.DeleteLineRule, error) {
+// parsePrintLineNum creates a PrintLineNumRule for line number filtering.
+func parsePrintLineNum(parts []string) (rule.LineRule, error) {
+	if len(parts) < 1 {
+		return nil, fmt.Errorf("print requires a line range")
+	}
+
+	lineRange, err := rule.ParseLineRange(parts[0])
+	if err != nil {
+		return nil, fmt.Errorf("invalid line range: %w", err)
+	}
+	return rule.NewPrintLineNumRule(lineRange), nil
+}
+
+// parseDelete creates a DeleteLineRule for pattern matching.
+func parseDelete(parts []string) (rule.LineRule, error) {
 	if len(parts) < 1 {
 		return nil, fmt.Errorf("delete requires a pattern")
 	}
 
-	pattern := parts[0]
-	return rule.NewDeleteLineRule(pattern)
+	return rule.NewDeleteLineRule(parts[0])
+}
+
+// parseDeleteLineNum creates a DeleteLineNumRule for line number filtering.
+func parseDeleteLineNum(parts []string) (rule.LineRule, error) {
+	if len(parts) < 1 {
+		return nil, fmt.Errorf("delete requires a line range")
+	}
+
+	lineRange, err := rule.ParseLineRange(parts[0])
+	if err != nil {
+		return nil, fmt.Errorf("invalid line range: %w", err)
+	}
+	return rule.NewDeleteLineNumRule(lineRange), nil
 }

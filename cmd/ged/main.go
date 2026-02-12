@@ -6,7 +6,9 @@ import (
 	"io"
 	"os"
 
+	"github.com/colinta/ged/internal/engine"
 	"github.com/colinta/ged/internal/parser"
+	"github.com/colinta/ged/internal/rule"
 )
 
 func main() {
@@ -20,36 +22,78 @@ func main() {
 // This is separated from main() for testability.
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: ged <rule>")
+		return fmt.Errorf("usage: ged <rule> [rule...]")
 	}
 
-	// Parse the rule from command line
-	ruleStr := args[0]
-	rule, err := parser.ParseRule(ruleStr)
-	if err != nil {
-		return fmt.Errorf("error parsing rule: %w", err)
-	}
+	// Parse all rules and build a list of DocumentRules.
+	// Consecutive LineRules are wrapped in an ApplyAllRule.
+	var docRules []rule.DocumentRule
+	var pendingLineRules []rule.LineRule
 
-	// Read stdin line by line
-	scanner := bufio.NewScanner(stdin)
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Apply the rule
-		results, err := rule.Apply(line)
+	for _, ruleStr := range args {
+		parsed, err := parser.ParseRule(ruleStr)
 		if err != nil {
-			return fmt.Errorf("error applying rule: %w", err)
+			return fmt.Errorf("error parsing rule %q: %w", ruleStr, err)
 		}
 
-		// Print each result line
-		for _, result := range results {
-			fmt.Fprintln(stdout, result)
+		switch r := parsed.(type) {
+		case rule.LineRule:
+			pendingLineRules = append(pendingLineRules, r)
+		case rule.DocumentRule:
+			// Flush any pending line rules into an ApplyAllRule first
+			if len(pendingLineRules) > 0 {
+				docRules = append(docRules, rule.NewApplyAllRule(pendingLineRules))
+				pendingLineRules = nil
+			}
+			docRules = append(docRules, r)
+		default:
+			return fmt.Errorf("unknown rule type from parser: %T", parsed)
 		}
 	}
 
-	// Check for scanner errors
+	// If there are no document rules, stream stdin line-by-line.
+	// This avoids buffering and works with infinite streams (e.g. tail -f).
+	if len(docRules) == 0 {
+		pipeline := engine.NewPipeline(pendingLineRules...)
+		scanner := bufio.NewScanner(stdin)
+		lineNum := 0
+		for scanner.Scan() {
+			lineNum++
+			results, err := pipeline.Process(scanner.Text(), lineNum)
+			if err != nil {
+				return fmt.Errorf("error applying rules: %w", err)
+			}
+			for _, result := range results {
+				fmt.Fprintln(stdout, result)
+			}
+		}
+		return scanner.Err()
+	}
+
+	// Document rules exist — flush any trailing line rules and buffer all input.
+	if len(pendingLineRules) > 0 {
+		docRules = append(docRules, rule.NewApplyAllRule(pendingLineRules))
+	}
+
+	scanner := bufio.NewScanner(stdin)
+	var lines []string
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("error reading input: %w", err)
+	}
+
+	for _, dr := range docRules {
+		var err error
+		lines, err = dr.ApplyDocument(lines)
+		if err != nil {
+			return fmt.Errorf("error applying rules: %w", err)
+		}
+	}
+
+	for _, line := range lines {
+		fmt.Fprintln(stdout, line)
 	}
 
 	return nil

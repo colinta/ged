@@ -1,6 +1,9 @@
 package rule
 
-import "regexp"
+import (
+	"regexp"
+	"strings"
+)
 
 // SubstitutionRule replaces text matching a pattern.
 type SubstitutionRule struct {
@@ -52,7 +55,7 @@ func NewSubstitutionRule(patternStr, replace string, opts ...SubstitutionOption)
 }
 
 // Apply performs the substitution on the given line.
-func (r *SubstitutionRule) Apply(line string) ([]string, error) {
+func (r *SubstitutionRule) Apply(line string, lineNum int) ([]string, error) {
 	var result string
 	if r.global {
 		result = r.pattern.ReplaceAllString(line, r.replace)
@@ -70,5 +73,5 @@ func (r *SubstitutionRule) Apply(line string) ([]string, error) {
 		}
 	}
 
-	return []string{result}, nil
+	return strings.Split(result, "\n"), nil
 }

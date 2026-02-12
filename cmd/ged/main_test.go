@@ -170,3 +170,144 @@ func TestRun_DeleteComments(t *testing.T) {
 		t.Errorf("got %q, want %q", out.String(), want)
 	}
 }
+
+func TestRun_MultipleRules(t *testing.T) {
+	in := strings.NewReader("hello\nworld\nhello world")
+	out := &bytes.Buffer{}
+
+	// Keep lines with "hello", then replace "o" with "0"
+	err := run([]string{"p/hello", "s/o/0/g"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "hell0\nhell0 w0rld\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_ChainedSubstitutions(t *testing.T) {
+	in := strings.NewReader("abc")
+	out := &bytes.Buffer{}
+
+	// a->b, then b->c (first match only each time)
+	err := run([]string{"s/a/b", "s/b/c"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// "abc" -> "bbc" -> "cbc"
+	want := "cbc\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_FilterDeletesBeforeSubstitute(t *testing.T) {
+	in := strings.NewReader("keep this\ndelete this\nkeep that")
+	out := &bytes.Buffer{}
+
+	// Delete lines with "delete", then substitute "keep" with "KEEP"
+	err := run([]string{"d/delete", "s/keep/KEEP"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "KEEP this\nKEEP that\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_Sort(t *testing.T) {
+	in := strings.NewReader("c\na\nb")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"sort"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "a\nb\nc\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_Reverse(t *testing.T) {
+	in := strings.NewReader("a\nb\nc")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"reverse"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "c\nb\na\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_JoinWithComma(t *testing.T) {
+	in := strings.NewReader("a\nb\nc")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"join/,/"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "a,b,c\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_LineRulesThenSort(t *testing.T) {
+	in := strings.NewReader("c3\na1\nb2")
+	out := &bytes.Buffer{}
+
+	// Remove digits, then sort
+	err := run([]string{`s/[0-9]//g`, "sort"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "a\nb\nc\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_SortThenLineRules(t *testing.T) {
+	in := strings.NewReader("cherry\napple\nbanana")
+	out := &bytes.Buffer{}
+
+	// Sort, then uppercase the first letter
+	err := run([]string{"sort", "s/a/A"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "Apple\nbAnana\ncherry\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_JoinBare(t *testing.T) {
+	in := strings.NewReader("a\nb\nc")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"join"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "abc\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}

@@ -8,7 +8,7 @@ func TestPrintLineRule_KeepsMatchingLines(t *testing.T) {
 		t.Fatalf("failed to create rule: %v", err)
 	}
 
-	result, err := rule.Apply("foo bar")
+	result, err := rule.Apply("foo bar", 1)
 	if err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
@@ -27,7 +27,7 @@ func TestPrintLineRule_RemovesNonMatchingLines(t *testing.T) {
 		t.Fatalf("failed to create rule: %v", err)
 	}
 
-	result, err := rule.Apply("bar baz")
+	result, err := rule.Apply("bar baz", 1)
 	if err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
@@ -44,13 +44,13 @@ func TestPrintLineRule_RegexPattern(t *testing.T) {
 	}
 
 	// Should match
-	result, _ := rule.Apply("123")
+	result, _ := rule.Apply("123", 1)
 	if len(result) != 1 {
 		t.Errorf("expected '123' to match, got deleted")
 	}
 
 	// Should not match
-	result, _ = rule.Apply("abc")
+	result, _ = rule.Apply("abc", 1)
 	if len(result) != 0 {
 		t.Errorf("expected 'abc' to be deleted, got kept")
 	}

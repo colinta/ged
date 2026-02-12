@@ -8,7 +8,7 @@ func TestSubstitutionRule_ReplacesFirstMatch(t *testing.T) {
 		t.Fatalf("failed to create rule: %v", err)
 	}
 
-	result, err := rule.Apply("hello world world")
+	result, err := rule.Apply("hello world world", 1)
 	if err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestSubstitutionRule_GlobalReplacesAll(t *testing.T) {
 		t.Fatalf("failed to create rule: %v", err)
 	}
 
-	result, err := rule.Apply("hello world")
+	result, err := rule.Apply("hello world", 1)
 	if err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestSubstitutionRule_NoMatch(t *testing.T) {
 		t.Fatalf("failed to create rule: %v", err)
 	}
 
-	result, err := rule.Apply("hello world")
+	result, err := rule.Apply("hello world", 1)
 	if err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestSubstitutionRule_RegexPattern(t *testing.T) {
 		t.Fatalf("failed to create rule: %v", err)
 	}
 
-	result, err := rule.Apply("foo 123 bar 456")
+	result, err := rule.Apply("foo 123 bar 456", 1)
 	if err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestSubstitutionRule_RegexReplacePattern_WithGlobal(t *testing.T) {
 		t.Fatalf("failed to create rule: %v", err)
 	}
 
-	result, err := rule.Apply("foo 123 bar 456")
+	result, err := rule.Apply("foo 123 bar 456", 1)
 	if err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestSubstitutionRule_RegexReplacePattern_OnlyFirst(t *testing.T) {
 		t.Fatalf("failed to create rule: %v", err)
 	}
 
-	result, err := rule.Apply("foo 123 bar 456")
+	result, err := rule.Apply("foo 123 bar 456", 1)
 	if err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
@@ -105,6 +105,44 @@ func TestSubstitutionRule_RegexReplacePattern_OnlyFirst(t *testing.T) {
 	want := "foo 1231 bar 456"
 	if result[0] != want {
 		t.Errorf("got %q, want %q", result[0], want)
+	}
+}
+
+func TestSubstitutionRule_LiteralPattern(t *testing.T) {
+	// QuoteMeta'd pattern — dots are literal, not regex wildcards
+	rule, err := NewSubstitutionRule(`foo\.bar`, "baz")
+	if err != nil {
+		t.Fatalf("failed to create rule: %v", err)
+	}
+
+	// Should match literal "foo.bar"
+	result, _ := rule.Apply("foo.bar", 1)
+	if result[0] != "baz" {
+		t.Errorf("got %q, want %q", result[0], "baz")
+	}
+
+	// Should NOT match "fooXbar"
+	result, _ = rule.Apply("fooXbar", 1)
+	if result[0] != "fooXbar" {
+		t.Errorf("got %q, want %q", result[0], "fooXbar")
+	}
+}
+
+func TestSubstitutionRule_NewlineInReplacement(t *testing.T) {
+	rule, err := NewSubstitutionRule("foo", "bar\nbaz")
+	if err != nil {
+		t.Fatalf("failed to create rule: %v", err)
+	}
+
+	result, _ := rule.Apply("foo", 1)
+	if len(result) != 2 {
+		t.Fatalf("expected 2 lines, got %d: %q", len(result), result)
+	}
+	if result[0] != "bar" {
+		t.Errorf("line 0: got %q, want %q", result[0], "bar")
+	}
+	if result[1] != "baz" {
+		t.Errorf("line 1: got %q, want %q", result[1], "baz")
 	}
 }
 
