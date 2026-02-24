@@ -11,7 +11,7 @@ func TestConditionalLineRule_MatchingLine(t *testing.T) {
 	sub, _ := NewSubstitutionRule("o", "x")
 	cond := NewConditionalLineRule(regexp.MustCompile("hello"), false, []LineRule{sub})
 
-	result, err := cond.Apply("hello world", 1)
+	result, err := cond.Apply("hello world", &LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -24,7 +24,7 @@ func TestConditionalLineRule_NonMatchingLine(t *testing.T) {
 	sub, _ := NewSubstitutionRule("o", "x")
 	cond := NewConditionalLineRule(regexp.MustCompile("hello"), false, []LineRule{sub})
 
-	result, err := cond.Apply("goodbye world", 1)
+	result, err := cond.Apply("goodbye world", &LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestConditionalLineRule_Inverted(t *testing.T) {
 	cond := NewConditionalLineRule(regexp.MustCompile("hello"), true, []LineRule{sub})
 
 	// "hello" matches the pattern, so inverted means rules DON'T apply
-	result, err := cond.Apply("hello world", 1)
+	result, err := cond.Apply("hello world", &LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestConditionalLineRule_Inverted(t *testing.T) {
 
 	// "goodbye" doesn't match, so inverted means rules DO apply
 	// First match only: first "o" in "goodbye" → "x"
-	result, err = cond.Apply("goodbye world", 1)
+	result, err = cond.Apply("goodbye world", &LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestConditionalLineRule_MultipleInnerRules(t *testing.T) {
 	sub2, _ := NewSubstitutionRule("b", "c")
 	cond := NewConditionalLineRule(regexp.MustCompile("x"), false, []LineRule{sub1, sub2})
 
-	result, err := cond.Apply("xab", 1)
+	result, err := cond.Apply("xab", &LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestConditionalLineRule_InnerDeleteRemovesLine(t *testing.T) {
 	del, _ := NewDeleteLineRule("hello")
 	cond := NewConditionalLineRule(regexp.MustCompile("hello"), false, []LineRule{del})
 
-	result, err := cond.Apply("hello world", 1)
+	result, err := cond.Apply("hello world", &LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestConditionalLineRule_PassesLineNum(t *testing.T) {
 	cond := NewConditionalLineRule(regexp.MustCompile(".*"), false, []LineRule{lineNumRule})
 
 	// Line 3 should be kept
-	result, err := cond.Apply("hello", 3)
+	result, err := cond.Apply("hello", &LineContext{LineNum: 3})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestConditionalLineRule_PassesLineNum(t *testing.T) {
 	}
 
 	// Line 2 should be filtered out by PrintLineNumRule
-	result, err = cond.Apply("hello", 2)
+	result, err = cond.Apply("hello", &LineContext{LineNum: 2})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

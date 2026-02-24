@@ -24,7 +24,7 @@ func NewPrintLineRule(patternStr string) (*PrintLineRule, error) {
 }
 
 // Apply returns the line if it matches, empty slice if not.
-func (r *PrintLineRule) Apply(line string, lineNum int) ([]string, error) {
+func (r *PrintLineRule) Apply(line string, ctx *LineContext) ([]string, error) {
 	if r.pattern.MatchString(line) {
 		return []string{line}, nil // Keep: line matches
 	}

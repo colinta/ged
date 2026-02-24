@@ -11,8 +11,8 @@ func NewDeleteLineNumRule(lineRange LineRange) *DeleteLineNumRule {
 }
 
 // Apply returns empty slice if line number matches the range, keeps the line if not.
-func (r *DeleteLineNumRule) Apply(line string, lineNum int) ([]string, error) {
-	if r.lineRange.Contains(lineNum) {
+func (r *DeleteLineNumRule) Apply(line string, ctx *LineContext) ([]string, error) {
+	if r.lineRange.Contains(ctx.LineNum) {
 		return []string{}, nil // Delete: line number matches
 	}
 	return []string{line}, nil // Keep: line number doesn't match

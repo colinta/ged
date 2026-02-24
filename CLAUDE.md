@@ -43,9 +43,11 @@ ged/
 │   │   ├── reverse_rule.go      # ReverseRule (document rule)
 │   │   ├── join_rule.go         # JoinRule (document rule)
 │   │   ├── apply_all_rule.go    # ApplyAllRule (wraps LineRules into DocumentRule)
+│   │   ├── conditional_rule.go  # ConditionalLineRule and ConditionalDocRule
 │   │   └── *_test.go            # Tests for each
 │   ├── parser/
-│   │   ├── parser.go            # Rule parsing
+│   │   ├── parser.go            # Rule parsing (single rules)
+│   │   ├── parse_args.go        # Multi-arg parsing with { } blocks
 │   │   └── *_test.go
 │   └── engine/
 │       ├── pipeline.go          # Processing pipeline

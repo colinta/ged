@@ -21,7 +21,7 @@ func NewConditionalLineRule(condition *regexp.Regexp, inverted bool, rules []Lin
 }
 
 // Apply checks the condition and either runs inner rules or passes the line through.
-func (r *ConditionalLineRule) Apply(line string, lineNum int) ([]string, error) {
+func (r *ConditionalLineRule) Apply(line string, ctx *LineContext) ([]string, error) {
 	matches := r.condition.MatchString(line)
 	if r.inverted {
 		matches = !matches
@@ -36,7 +36,7 @@ func (r *ConditionalLineRule) Apply(line string, lineNum int) ([]string, error) 
 	for _, innerRule := range r.rules {
 		var next []string
 		for _, l := range current {
-			out, err := innerRule.Apply(l, lineNum)
+			out, err := innerRule.Apply(l, ctx)
 			if err != nil {
 				return nil, err
 			}

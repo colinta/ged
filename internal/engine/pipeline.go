@@ -16,10 +16,10 @@ func NewPipeline(rules ...rule.LineRule) *Pipeline {
 }
 
 // Process applies all rules to a line and returns the results.
-// lineNum is the 1-indexed line number of the input line.
+// ctx carries the 1-indexed line number and shared processing state.
 // If any rule returns an empty slice, processing stops and empty is returned.
 // Each output line from a rule feeds into the next rule.
-func (p *Pipeline) Process(line string, lineNum int) ([]string, error) {
+func (p *Pipeline) Process(line string, ctx *rule.LineContext) ([]string, error) {
 	// Start with the input line
 	lines := []string{line}
 
@@ -28,7 +28,7 @@ func (p *Pipeline) Process(line string, lineNum int) ([]string, error) {
 
 		// Apply rule to each line from previous stage
 		for _, l := range lines {
-			result, err := r.Apply(l, lineNum)
+			result, err := r.Apply(l, ctx)
 			if err != nil {
 				return nil, err
 			}

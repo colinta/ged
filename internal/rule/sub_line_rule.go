@@ -55,7 +55,7 @@ func NewSubstitutionRule(patternStr, replace string, opts ...SubstitutionOption)
 }
 
 // Apply performs the substitution on the given line.
-func (r *SubstitutionRule) Apply(line string, lineNum int) ([]string, error) {
+func (r *SubstitutionRule) Apply(line string, ctx *LineContext) ([]string, error) {
 	var result string
 	if r.global {
 		result = r.pattern.ReplaceAllString(line, r.replace)

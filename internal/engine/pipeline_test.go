@@ -10,7 +10,7 @@ func TestPipeline_SingleRule(t *testing.T) {
 	sub, _ := rule.NewSubstitutionRule("foo", "bar")
 	p := NewPipeline(sub)
 
-	result, err := p.Process("hello foo", 1)
+	result, err := p.Process("hello foo", &rule.LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -26,7 +26,7 @@ func TestPipeline_TwoRulesChain(t *testing.T) {
 	sub2, _ := rule.NewSubstitutionRule("b", "c")
 	p := NewPipeline(sub1, sub2)
 
-	result, err := p.Process("aaa", 1)
+	result, err := p.Process("aaa", &rule.LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestPipeline_FilterThenSubstitute(t *testing.T) {
 	p := NewPipeline(print, sub)
 
 	// Line matches filter, gets transformed
-	result, err := p.Process("foo bar", 1)
+	result, err := p.Process("foo bar", &rule.LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestPipeline_FilterStopsChain(t *testing.T) {
 	p := NewPipeline(print, sub)
 
 	// Line doesn't match filter - should produce no output
-	result, err := p.Process("bar only", 1)
+	result, err := p.Process("bar only", &rule.LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestPipeline_SubstituteThenFilter(t *testing.T) {
 	p := NewPipeline(sub, print)
 
 	// "hello world" becomes "foo world", which matches filter
-	result, err := p.Process("hello world", 1)
+	result, err := p.Process("hello world", &rule.LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestPipeline_SubstituteThenFilter(t *testing.T) {
 	}
 
 	// "goodbye world" stays "goodbye world", doesn't match filter
-	result, err = p.Process("goodbye world", 2)
+	result, err = p.Process("goodbye world", &rule.LineContext{LineNum: 2})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestPipeline_SubstituteThenFilter(t *testing.T) {
 func TestPipeline_EmptyPipeline(t *testing.T) {
 	p := NewPipeline()
 
-	result, err := p.Process("hello", 1)
+	result, err := p.Process("hello", &rule.LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -115,13 +115,13 @@ func TestPipeline_DeleteRule(t *testing.T) {
 	p := NewPipeline(del, sub)
 
 	// Non-matching line passes through and gets substituted
-	result, _ := p.Process("public info", 1)
+	result, _ := p.Process("public info", &rule.LineContext{LineNum: 1})
 	if len(result) != 1 || result[0] != "PUBLIC info" {
 		t.Errorf("got %v, want [\"PUBLIC info\"]", result)
 	}
 
 	// Matching line is deleted
-	result, _ = p.Process("secret data", 2)
+	result, _ = p.Process("secret data", &rule.LineContext{LineNum: 2})
 	if len(result) != 0 {
 		t.Errorf("got %v, want []", result)
 	}

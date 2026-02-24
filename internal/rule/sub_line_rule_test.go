@@ -8,7 +8,7 @@ func TestSubstitutionRule_ReplacesFirstMatch(t *testing.T) {
 		t.Fatalf("failed to create rule: %v", err)
 	}
 
-	result, err := rule.Apply("hello world world", 1)
+	result, err := rule.Apply("hello world world", &LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestSubstitutionRule_GlobalReplacesAll(t *testing.T) {
 		t.Fatalf("failed to create rule: %v", err)
 	}
 
-	result, err := rule.Apply("hello world", 1)
+	result, err := rule.Apply("hello world", &LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestSubstitutionRule_NoMatch(t *testing.T) {
 		t.Fatalf("failed to create rule: %v", err)
 	}
 
-	result, err := rule.Apply("hello world", 1)
+	result, err := rule.Apply("hello world", &LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestSubstitutionRule_RegexPattern(t *testing.T) {
 		t.Fatalf("failed to create rule: %v", err)
 	}
 
-	result, err := rule.Apply("foo 123 bar 456", 1)
+	result, err := rule.Apply("foo 123 bar 456", &LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestSubstitutionRule_RegexReplacePattern_WithGlobal(t *testing.T) {
 		t.Fatalf("failed to create rule: %v", err)
 	}
 
-	result, err := rule.Apply("foo 123 bar 456", 1)
+	result, err := rule.Apply("foo 123 bar 456", &LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestSubstitutionRule_RegexReplacePattern_OnlyFirst(t *testing.T) {
 		t.Fatalf("failed to create rule: %v", err)
 	}
 
-	result, err := rule.Apply("foo 123 bar 456", 1)
+	result, err := rule.Apply("foo 123 bar 456", &LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
@@ -116,13 +116,13 @@ func TestSubstitutionRule_LiteralPattern(t *testing.T) {
 	}
 
 	// Should match literal "foo.bar"
-	result, _ := rule.Apply("foo.bar", 1)
+	result, _ := rule.Apply("foo.bar", &LineContext{LineNum: 1})
 	if result[0] != "baz" {
 		t.Errorf("got %q, want %q", result[0], "baz")
 	}
 
 	// Should NOT match "fooXbar"
-	result, _ = rule.Apply("fooXbar", 1)
+	result, _ = rule.Apply("fooXbar", &LineContext{LineNum: 1})
 	if result[0] != "fooXbar" {
 		t.Errorf("got %q, want %q", result[0], "fooXbar")
 	}
@@ -134,7 +134,7 @@ func TestSubstitutionRule_NewlineInReplacement(t *testing.T) {
 		t.Fatalf("failed to create rule: %v", err)
 	}
 
-	result, _ := rule.Apply("foo", 1)
+	result, _ := rule.Apply("foo", &LineContext{LineNum: 1})
 	if len(result) != 2 {
 		t.Fatalf("expected 2 lines, got %d: %q", len(result), result)
 	}

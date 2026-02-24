@@ -57,10 +57,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if len(docRules) == 0 {
 		pipeline := engine.NewPipeline(pendingLineRules...)
 		scanner := bufio.NewScanner(stdin)
-		lineNum := 0
+		ctx := &rule.LineContext{}
 		for scanner.Scan() {
-			lineNum++
-			results, err := pipeline.Process(scanner.Text(), lineNum)
+			ctx.LineNum++
+			results, err := pipeline.Process(scanner.Text(), ctx)
 			if err != nil {
 				return fmt.Errorf("error applying rules: %w", err)
 			}

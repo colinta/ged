@@ -24,7 +24,7 @@ func NewDeleteLineRule(patternStr string) (*DeleteLineRule, error) {
 }
 
 // Apply returns empty slice if line matches, keeps the line if not.
-func (r *DeleteLineRule) Apply(line string, lineNum int) ([]string, error) {
+func (r *DeleteLineRule) Apply(line string, ctx *LineContext) ([]string, error) {
 	if r.pattern.MatchString(line) {
 		return []string{}, nil // Delete: line matches
 	}

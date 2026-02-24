@@ -11,8 +11,8 @@ func NewPrintLineNumRule(lineRange LineRange) *PrintLineNumRule {
 }
 
 // Apply returns the line if its line number matches the range, empty slice if not.
-func (r *PrintLineNumRule) Apply(line string, lineNum int) ([]string, error) {
-	if r.lineRange.Contains(lineNum) {
+func (r *PrintLineNumRule) Apply(line string, ctx *LineContext) ([]string, error) {
+	if r.lineRange.Contains(ctx.LineNum) {
 		return []string{line}, nil // Keep: line number matches
 	}
 	return []string{}, nil // Delete: line number doesn't match

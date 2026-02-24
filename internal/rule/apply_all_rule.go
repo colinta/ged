@@ -20,13 +20,14 @@ func (r *ApplyAllRule) ApplyDocument(lines []string) ([]string, error) {
 	var result []string
 
 	for lineNum, line := range lines {
+		ctx := &LineContext{LineNum: lineNum + 1}
 		// Process this line through all rules
 		current := []string{line}
 
 		for _, lr := range r.rules {
 			var next []string
 			for _, l := range current {
-				out, err := lr.Apply(l, lineNum+1)
+				out, err := lr.Apply(l, ctx)
 				if err != nil {
 					return nil, err
 				}

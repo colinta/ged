@@ -8,7 +8,7 @@ func TestDeleteLineRule_RemovesMatchingLines(t *testing.T) {
 		t.Fatalf("failed to create rule: %v", err)
 	}
 
-	result, err := rule.Apply("foo bar", 1)
+	result, err := rule.Apply("foo bar", &LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
@@ -24,7 +24,7 @@ func TestDeleteLineRule_KeepsNonMatchingLines(t *testing.T) {
 		t.Fatalf("failed to create rule: %v", err)
 	}
 
-	result, err := rule.Apply("bar baz", 1)
+	result, err := rule.Apply("bar baz", &LineContext{LineNum: 1})
 	if err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
@@ -44,13 +44,13 @@ func TestDeleteLineRule_RegexPattern(t *testing.T) {
 	}
 
 	// Should delete (matches comment)
-	result, _ := rule.Apply("  # comment", 1)
+	result, _ := rule.Apply("  # comment", &LineContext{LineNum: 1})
 	if len(result) != 0 {
 		t.Errorf("expected comment line to be deleted")
 	}
 
 	// Should keep (not a comment)
-	result, _ = rule.Apply("code here", 1)
+	result, _ = rule.Apply("code here", &LineContext{LineNum: 1})
 	if len(result) != 1 {
 		t.Errorf("expected non-comment line to be kept")
 	}

@@ -14,8 +14,8 @@ func NewSubLineNumRule(lineRange LineRange, replacement string) *SubLineNumRule 
 }
 
 // Apply returns the replacement if line number matches, keeps the original line if not.
-func (r *SubLineNumRule) Apply(line string, lineNum int) ([]string, error) {
-	if r.lineRange.Contains(lineNum) {
+func (r *SubLineNumRule) Apply(line string, ctx *LineContext) ([]string, error) {
+	if r.lineRange.Contains(ctx.LineNum) {
 		return strings.Split(r.replacement, "\n"), nil
 	}
 	return []string{line}, nil

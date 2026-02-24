@@ -21,7 +21,7 @@ func TestSubLineNumRule(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := NewSubLineNumRule(tt.lineRange, tt.replacement)
-			result, err := r.Apply(tt.line, tt.lineNum)
+			result, err := r.Apply(tt.line, &LineContext{LineNum: tt.lineNum})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -37,7 +37,7 @@ func TestSubLineNumRule(t *testing.T) {
 
 func TestSubLineNumRule_NewlineInReplacement(t *testing.T) {
 	r := NewSubLineNumRule(SingleLine(2), "hello\nworld")
-	result, err := r.Apply("original", 2)
+	result, err := r.Apply("original", &LineContext{LineNum: 2})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
