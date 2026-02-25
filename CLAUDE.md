@@ -17,9 +17,13 @@ You are a professional go developer and are teaching me the basics of Go by writ
 | 5 | ✅ Complete | Literal string matching (backtick/quote delimiters) |
 | 6 | ✅ Complete | Document rules (`sort`, `reverse`, `join`) |
 | 7 | ✅ Complete | Conditional rules (`if/pattern/ { rules }`) |
-| 8-20 | 🔲 Pending | See details below |
+| 7b | ✅ Complete | LineContext refactor + control flow rules (`on/off/after/toggle`) |
+| 8 | 🔲 Pending | Between condition (`between/start/end/ { rules }`) |
+| 9-12 | 🔲 Pending | File I/O, text modification, columns, extraction |
+| 13 | ✅ Moved to 7b | Control flow rules (done early, needed LineContext) |
+| 14-20 | 🔲 Pending | External commands, diff/colors, more rules, polish |
 
-**To continue**: Run `go test ./...` to verify everything works, then start Phase 7.
+**To continue**: Run `go test ./...` to verify everything works, then start Phase 8.
 
 ## Project Structure
 
@@ -31,7 +35,7 @@ ged/
 │       └── main_test.go         # CLI integration tests
 ├── internal/
 │   ├── rule/
-│   │   ├── rule.go              # LineRule and DocumentRule interfaces
+│   │   ├── rule.go              # LineRule, DocumentRule, LineContext, SetupRule, PrintState
 │   │   ├── sub_line_rule.go     # SubstitutionRule (pattern-based)
 │   │   ├── sub_linenum_rule.go  # SubLineNumRule (line number-based)
 │   │   ├── print_line_rule.go   # PrintLineRule (pattern-based)
@@ -44,9 +48,13 @@ ged/
 │   │   ├── join_rule.go         # JoinRule (document rule)
 │   │   ├── apply_all_rule.go    # ApplyAllRule (wraps LineRules into DocumentRule)
 │   │   ├── conditional_rule.go  # ConditionalLineRule and ConditionalDocRule
+│   │   ├── on_rule.go           # OnRule (control flow)
+│   │   ├── off_rule.go          # OffRule (control flow)
+│   │   ├── after_rule.go        # AfterRule (control flow)
+│   │   ├── toggle_rule.go       # ToggleRule (control flow)
 │   │   └── *_test.go            # Tests for each
 │   ├── parser/
-│   │   ├── parser.go            # Rule parsing (single rules)
+│   │   ├── parser.go            # Rule parsing (single rules + control rules)
 │   │   ├── parse_args.go        # Multi-arg parsing with { } blocks
 │   │   └── *_test.go
 │   └── engine/
@@ -217,10 +225,10 @@ echo -e "hello\nworld\nhello" | ged 'p/hello/' 's/o/x/'
 
 ### Implementation Notes
 
-**Rule Interface Change**: All rules now receive line number:
+**Rule Interface Change**: All rules now receive a context carrying the line number (refactored from bare `lineNum int` in Phase 7b):
 ```go
-type Rule interface {
-    Apply(line string, lineNum int) ([]string, error)
+type LineRule interface {
+    Apply(line string, ctx *LineContext) ([]string, error)
 }
 ```
 
@@ -318,10 +326,10 @@ echo "hello" | ged 's/hello/line1\nline2/'
 
 **Architecture Change**: Renamed `Rule` to `LineRule` (per-line processing) and added `DocumentRule` (whole-document processing). The rename is transparent to existing code because Go uses implicit interface conformance.
 
-**Two Interfaces**:
+**Two Interfaces** (note: `lineNum int` was later refactored to `*LineContext` in Phase 7b):
 ```go
 type LineRule interface {
-    Apply(line string, lineNum int) ([]string, error)
+    Apply(line string, ctx *LineContext) ([]string, error)
 }
 type DocumentRule interface {
     ApplyDocument(lines []string) ([]string, error)
@@ -477,6 +485,99 @@ echo -e "hello\nworld\nhello" | ged '!if/hello/' '{' 's/o/x/' '}'
 
 echo -e "b_item\na_item\nc_other\nd_item" | ged 'if/item/' '{' sort '}'
 # Output: a_item\nb_item\nc_other\nd_item
+```
+
+---
+
+## Phase 7b: LineContext Refactor + Control Flow Rules ✅ COMPLETE
+
+**Goal**: Refactor `Apply` signature to use shared context, then implement `on/off/after/toggle` print-control rules (originally Phase 13, moved up because control flow motivates the context design).
+
+**Go Concepts Learned**:
+- **`iota` for enums**: Constants auto-increment from 0 in a `const` block — zero value conventionally means "unset/default"
+- **Optional interfaces**: `SetupRule` is a separate interface; the caller uses type assertion `if s, ok := r.(SetupRule); ok { ... }` to call it only on rules that implement it
+- **Shared mutable state via context**: Multiple rules read/write `ctx.Printing` instead of maintaining rule-local state
+- **Self-initializing Setup**: Each `Setup` method guards with `if ctx.Printing == PrintDefault` so the first control rule in the pipeline determines the starting state
+
+### Implementation Notes
+
+**LineContext Refactor**: Replaced `lineNum int` parameter with `*LineContext` across all `LineRule.Apply` signatures. Used `ged` itself (with backtick literal matching) to perform the mechanical refactor across test files.
+
+**PrintState Enum**:
+```go
+type PrintState int
+const (
+    PrintDefault PrintState = iota  // 0 — no control rule, print everything
+    PrintOn                         // 1 — printing enabled
+    PrintOff                        // 2 — printing suppressed
+)
+```
+
+**Control Rules Don't Filter**: They set `ctx.Printing` but always return `[]string{line}`. The caller (main.go streaming loop or ApplyAllRule) checks `ctx.Printing` after processing each line and decides whether to include it in output. This means other rules in the pipeline still see every line.
+
+**SetupRule**: Optional interface called once before the processing loop to set initial `PrintState`. Guards with `PrintDefault` check so multiple control rules don't clobber each other — first rule wins.
+
+**AfterRule Local State**: Uses rule-local `matched bool` in addition to shared `ctx.Printing`. Checks `r.matched` before checking the pattern, so the matching line itself stays off and the next line turns on.
+
+### Semantics
+
+| Rule | Initial state | Match line printed? | Lines after match |
+|------|--------------|--------------------|--------------------|
+| `on/pat/` | off | yes | on |
+| `off/pat/` | on | no | off |
+| `after/pat/` | off | no | on |
+| `toggle/pat/` | off | flips | flipped |
+
+### Tests Written
+- [x] OnRule starts at match, includes match line
+- [x] OnRule with no match prints nothing
+- [x] OffRule stops at match, excludes match line
+- [x] OffRule with no match prints everything
+- [x] AfterRule starts after match, excludes match line
+- [x] AfterRule with no match prints nothing
+- [x] ToggleRule flips on each match
+- [x] ToggleRule match line follows new state
+- [x] On + Off combined (first rule sets initial state)
+- [x] Parser: on/pattern/, off/pattern/, after/pattern/, toggle/pattern/
+- [x] Parser: literal delimiters work with control rules
+- [x] Parser: missing/empty pattern errors
+- [x] CLI: on, off, after, toggle end-to-end
+- [x] CLI: on with substitution
+- [x] CLI: on + off combined
+
+### Files Created
+- `internal/rule/on_rule.go` - OnRule (SetupRule + LineRule)
+- `internal/rule/off_rule.go` - OffRule (SetupRule + LineRule)
+- `internal/rule/after_rule.go` - AfterRule (SetupRule + LineRule)
+- `internal/rule/toggle_rule.go` - ToggleRule (SetupRule + LineRule)
+- `internal/rule/control_rule_test.go` - Tests
+- `internal/parser/parse_control_test.go` - Tests
+
+### Files Modified
+- `internal/rule/rule.go` - Added LineContext, PrintState, SetupRule; updated LineRule.Apply signature
+- `internal/rule/apply_all_rule.go` - Calls Setup, checks ctx.Printing
+- `internal/rule/*.go` - All rule Apply signatures updated (lineNum int → ctx *LineContext)
+- `internal/engine/pipeline.go` - Process signature updated
+- `internal/parser/parser.go` - Added parseControl, on/off/after/toggle dispatch
+- `cmd/ged/main.go` - Calls Setup, checks ctx.Printing in streaming path
+- All `*_test.go` files - Updated Apply/Process calls to use &LineContext{}
+
+### Deliverable ✅
+```bash
+echo -e "a\nstart\nb\nc" | ged 'on/start/'
+# Output: start\nb\nc
+
+echo -e "a\nb\nstop\nc" | ged 'off/stop/'
+# Output: a\nb
+
+echo -e "a\nmarker\nb\nc" | ged 'after/marker/'
+# Output: b\nc
+
+echo -e "off\n---\non1\non2\n---\noff2" | ged 'toggle/---/'
+# Output: ---\non1\non2
+
+echo -e "before\nstart\nmiddle\nend\nafter" | ged 'on/start/' 'off/end/'
+# Output: start\nmiddle
 ```
 
 ---
@@ -677,39 +778,10 @@ echo "hello world" | ged '1/(\w+) (\w+)/'
 
 ---
 
-## Phase 13: Control Flow Rules
+## Phase 13: Control Flow Rules ✅ MOVED TO PHASE 7b
 
-**Goal**: Implement `on/`, `off/`, `after/`, `toggle/`
-
-**Go Concepts Introduced**:
-- Mutable state across lines
-- State machines
-- Pointer receivers for methods
-
-### Steps
-
-1. **Add print state to Pipeline**
-   - `printOn *bool` - nil means no control active
-
-2. **Implement control rules**:
-   - `OnRule` - start printing at match
-   - `OffRule` - stop printing at match
-   - `AfterRule` - start printing after match
-   - `ToggleRule` - flip state at each match
-
-### Tests to Write
-- [ ] On starts printing at match
-- [ ] Off stops printing at match
-- [ ] After starts one line after match
-- [ ] Toggle flips state
-- [ ] Control rules combine correctly
-- [ ] State resets between files
-
-### Deliverable
-```bash
-echo -e "a\nstart\nb\nc" | ged 'on/start/'
-# Output: start\nb\nc
-```
+Implemented early as Phase 7b because control flow rules motivated the LineContext refactor.
+See Phase 7b above for full details.
 
 ---
 
@@ -942,12 +1014,12 @@ After each phase, you should be comfortable with:
 | 5 | strings package, escape handling |
 | 6 | sort package, type assertions, buffering |
 | 7 | Recursive parsing, tree structures |
+| 7b | iota enums, optional interfaces, shared mutable context |
 | 8 | Stateful processing |
 | 9 | io interfaces, defer, file handling |
 | 10 | String manipulation |
 | 11 | Index manipulation |
 | 12 | Regex submatches |
-| 13 | State machines |
 | 14 | os/exec, subprocesses |
 | 15 | Terminal I/O, ANSI codes |
 | 16-18 | Pattern consolidation |
