@@ -58,11 +58,22 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		pipeline := engine.NewPipeline(pendingLineRules...)
 		scanner := bufio.NewScanner(stdin)
 		ctx := &rule.LineContext{}
+
+		// Call Setup on any rules that need it
+		for _, lr := range pendingLineRules {
+			if s, ok := lr.(rule.SetupRule); ok {
+				s.Setup(ctx)
+			}
+		}
+
 		for scanner.Scan() {
 			ctx.LineNum++
 			results, err := pipeline.Process(scanner.Text(), ctx)
 			if err != nil {
 				return fmt.Errorf("error applying rules: %w", err)
+			}
+			if ctx.Printing == rule.PrintOff {
+				continue
 			}
 			for _, result := range results {
 				fmt.Fprintln(stdout, result)

@@ -409,3 +409,93 @@ func TestRun_NestedIf(t *testing.T) {
 		t.Errorf("got %q, want %q", out.String(), want)
 	}
 }
+
+func TestRun_On(t *testing.T) {
+	in := strings.NewReader("a\nstart\nb\nc")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"on/start/"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "start\nb\nc\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_Off(t *testing.T) {
+	in := strings.NewReader("a\nb\nstop\nc")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"off/stop/"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "a\nb\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_After(t *testing.T) {
+	in := strings.NewReader("a\nmarker\nb\nc")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"after/marker/"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "b\nc\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_Toggle(t *testing.T) {
+	in := strings.NewReader("off1\n---\non1\non2\n---\noff2")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"toggle/---/"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "---\non1\non2\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_OnWithSubstitution(t *testing.T) {
+	in := strings.NewReader("a\nstart\nb\nc")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"on/start/", "s/b/B/"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "start\nB\nc\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_OnOffCombined(t *testing.T) {
+	in := strings.NewReader("before\nstart\nmiddle\nend\nafter")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"on/start/", "off/end/"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "start\nmiddle\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}

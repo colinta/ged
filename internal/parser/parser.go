@@ -27,6 +27,18 @@ func ParseRule(input string) (any, error) {
 	if strings.HasPrefix(input, "!if") || strings.HasPrefix(input, "if") {
 		return parseIf(input)
 	}
+	if strings.HasPrefix(input, "on") {
+		return parseControl(input, "on")
+	}
+	if strings.HasPrefix(input, "off") {
+		return parseControl(input, "off")
+	}
+	if strings.HasPrefix(input, "after") {
+		return parseControl(input, "after")
+	}
+	if strings.HasPrefix(input, "toggle") {
+		return parseControl(input, "toggle")
+	}
 
 	if len(input) < 2 {
 		return nil, fmt.Errorf("invalid rule: too short")
@@ -224,6 +236,42 @@ func parseDeleteLineNum(parts []string) (rule.LineRule, error) {
 		return nil, fmt.Errorf("invalid line range: %w", err)
 	}
 	return rule.NewDeleteLineNumRule(lineRange), nil
+}
+
+// parseControl parses "name/pattern/" for control rules (on, off, after, toggle).
+func parseControl(input string, name string) (rule.LineRule, error) {
+	rest := input[len(name):]
+	if len(rest) == 0 {
+		return nil, fmt.Errorf("%s requires a pattern", name)
+	}
+
+	delimiter := rest[0]
+	parts, err := splitByDelimiter(rest[1:], delimiter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parts) < 1 || parts[0] == "" {
+		return nil, fmt.Errorf("%s requires a pattern", name)
+	}
+
+	pattern := parts[0]
+	if delimiter == '`' || delimiter == '\'' || delimiter == '"' {
+		pattern = regexp.QuoteMeta(pattern)
+	}
+
+	switch name {
+	case "on":
+		return rule.NewOnRule(pattern)
+	case "off":
+		return rule.NewOffRule(pattern)
+	case "after":
+		return rule.NewAfterRule(pattern)
+	case "toggle":
+		return rule.NewToggleRule(pattern)
+	default:
+		return nil, fmt.Errorf("unknown control command: %s", name)
+	}
 }
 
 // condition is a parser-internal type representing a parsed if/!if condition.

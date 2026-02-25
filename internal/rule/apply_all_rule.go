@@ -16,11 +16,21 @@ func NewApplyAllRule(rules []LineRule) *ApplyAllRule {
 // ApplyDocument applies the line rules pipeline to each line of the document.
 // Each line is processed through all rules in order, with each rule's output
 // feeding into the next rule. Line numbers are 1-indexed.
+// Rules implementing SetupRule have Setup called once before processing.
+// After processing each line, ctx.Printing is checked to decide inclusion.
 func (r *ApplyAllRule) ApplyDocument(lines []string) ([]string, error) {
 	var result []string
+	ctx := &LineContext{}
 
-	for lineNum, line := range lines {
-		ctx := &LineContext{LineNum: lineNum + 1}
+	// Call Setup on any rules that need it
+	for _, lr := range r.rules {
+		if s, ok := lr.(SetupRule); ok {
+			s.Setup(ctx)
+		}
+	}
+
+	for i, line := range lines {
+		ctx.LineNum = i + 1
 		// Process this line through all rules
 		current := []string{line}
 
@@ -39,6 +49,11 @@ func (r *ApplyAllRule) ApplyDocument(lines []string) ([]string, error) {
 				break
 			}
 			current = next
+		}
+
+		// Check print state after processing
+		if ctx.Printing == PrintOff {
+			continue
 		}
 
 		result = append(result, current...)
