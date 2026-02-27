@@ -24,6 +24,9 @@ func ParseRule(input string) (any, error) {
 	if strings.HasPrefix(input, "join") {
 		return parseJoin(input)
 	}
+	if strings.HasPrefix(input, "!between") || strings.HasPrefix(input, "between") {
+		return parseBetween(input)
+	}
 	if strings.HasPrefix(input, "!if") || strings.HasPrefix(input, "if") {
 		return parseIf(input)
 	}
@@ -321,5 +324,63 @@ func parseIf(input string) (*condition, error) {
 	return &condition{
 		pattern:  compiled,
 		inverted: inverted,
+	}, nil
+}
+
+// betweenCondition is a parser-internal type representing a parsed between condition.
+// Like condition, it gets assembled with inner rules from { } blocks in parseArgs.
+type betweenCondition struct {
+	startPattern *regexp.Regexp
+	endPattern   *regexp.Regexp
+	inverted     bool
+}
+
+// parseBetween parses "between/start/end/" or "!between/start/end/" and returns a betweenCondition.
+func parseBetween(input string) (*betweenCondition, error) {
+	inverted := false
+	rest := input
+
+	if strings.HasPrefix(rest, "!between") {
+		inverted = true
+		rest = rest[8:]
+	} else {
+		rest = rest[7:]
+	}
+
+	if len(rest) == 0 {
+		return nil, fmt.Errorf("between requires start and end patterns")
+	}
+
+	delimiter := rest[0]
+	parts, err := splitByDelimiter(rest[1:], delimiter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		return nil, fmt.Errorf("between requires start and end patterns")
+	}
+
+	startPattern := parts[0]
+	endPattern := parts[1]
+	if delimiter == '`' || delimiter == '\'' || delimiter == '"' {
+		startPattern = regexp.QuoteMeta(startPattern)
+		endPattern = regexp.QuoteMeta(endPattern)
+	}
+
+	startCompiled, err := regexp.Compile(startPattern)
+	if err != nil {
+		return nil, fmt.Errorf("invalid start pattern in between: %w", err)
+	}
+
+	endCompiled, err := regexp.Compile(endPattern)
+	if err != nil {
+		return nil, fmt.Errorf("invalid end pattern in between: %w", err)
+	}
+
+	return &betweenCondition{
+		startPattern: startCompiled,
+		endPattern:   endCompiled,
+		inverted:     inverted,
 	}, nil
 }

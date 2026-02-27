@@ -43,33 +43,13 @@ func parseArgs(args []string) ([]any, []string, error) {
 		args = args[1:]
 
 		if cond, ok := parsed.(*condition); ok {
-			// Expect "{" to start the block
-			if len(args) == 0 || args[0] != "{" {
-				return nil, nil, fmt.Errorf("expected '{' after if condition")
-			}
-			args = args[1:] // consume "{"
-
-			// Recurse to collect inner rules
-			innerParsed, remaining, err := parseArgs(args)
+			innerParsed, remaining, err := collectBlock(args, "if condition")
 			if err != nil {
 				return nil, nil, err
 			}
-			if len(remaining) == 0 || remaining[0] != "}" {
-				return nil, nil, fmt.Errorf("expected '}'")
-			}
-			args = remaining[1:] // consume "}"
+			args = remaining
 
-			// Check if any inner rule is a DocumentRule.
-			// If so, build a ConditionalDocRule; otherwise ConditionalLineRule.
-			hasDocRule := false
-			for _, p := range innerParsed {
-				if _, ok := p.(rule.DocumentRule); ok {
-					hasDocRule = true
-					break
-				}
-			}
-
-			if hasDocRule {
+			if hasDocRule(innerParsed) {
 				docRules := buildDocRules(innerParsed)
 				results = append(results, rule.NewConditionalDocRule(cond.pattern, cond.inverted, docRules))
 			} else {
@@ -79,12 +59,57 @@ func parseArgs(args []string) ([]any, []string, error) {
 				}
 				results = append(results, rule.NewConditionalLineRule(cond.pattern, cond.inverted, lineRules))
 			}
+		} else if cond, ok := parsed.(*betweenCondition); ok {
+			innerParsed, remaining, err := collectBlock(args, "between condition")
+			if err != nil {
+				return nil, nil, err
+			}
+			args = remaining
+
+			if hasDocRule(innerParsed) {
+				docRules := buildDocRules(innerParsed)
+				results = append(results, rule.NewBetweenDocRule(cond.startPattern, cond.endPattern, cond.inverted, docRules))
+			} else {
+				var lineRules []rule.LineRule
+				for _, p := range innerParsed {
+					lineRules = append(lineRules, p.(rule.LineRule))
+				}
+				results = append(results, rule.NewBetweenLineRule(cond.startPattern, cond.endPattern, cond.inverted, lineRules))
+			}
 		} else {
 			results = append(results, parsed)
 		}
 	}
 
 	return results, args, nil
+}
+
+// collectBlock consumes "{", inner rules, and "}" from args.
+// Returns the inner rules and the remaining args after "}".
+func collectBlock(args []string, context string) ([]any, []string, error) {
+	if len(args) == 0 || args[0] != "{" {
+		return nil, nil, fmt.Errorf("expected '{' after %s", context)
+	}
+	args = args[1:] // consume "{"
+
+	innerParsed, remaining, err := parseArgs(args)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(remaining) == 0 || remaining[0] != "}" {
+		return nil, nil, fmt.Errorf("expected '}'")
+	}
+	return innerParsed, remaining[1:], nil
+}
+
+// hasDocRule reports whether any element in parsed is a DocumentRule.
+func hasDocRule(parsed []any) bool {
+	for _, p := range parsed {
+		if _, ok := p.(rule.DocumentRule); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // buildDocRules converts a mixed list of LineRule/DocumentRule into a

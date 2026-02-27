@@ -11,9 +11,35 @@ const (
 )
 
 // LineContext carries per-line state through the processing pipeline.
+// Rules that need per-document mutable state store it here via GetState/SetState
+// rather than on the rule struct, so a single rule pipeline can be shared across
+// multiple documents processed in parallel.
 type LineContext struct {
 	LineNum  int
 	Printing PrintState
+	state    map[any]any // rule-local state, lazily initialized
+}
+
+// GetState retrieves rule-local state from the context.
+// The key should be the rule's own pointer (r) to ensure uniqueness.
+// Returns defaultVal if no state has been set for this key.
+func GetState[T any](ctx *LineContext, key any, defaultVal T) T {
+	if ctx.state == nil {
+		return defaultVal
+	}
+	v, ok := ctx.state[key]
+	if !ok {
+		return defaultVal
+	}
+	return v.(T)
+}
+
+// SetState stores rule-local state on the context.
+func SetState(ctx *LineContext, key any, val any) {
+	if ctx.state == nil {
+		ctx.state = make(map[any]any)
+	}
+	ctx.state[key] = val
 }
 
 // LineRule is the core interface for per-line text transformation.

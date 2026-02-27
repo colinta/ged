@@ -6,7 +6,6 @@ import "regexp"
 // The matching line itself is not printed — printing starts on the next line.
 type AfterRule struct {
 	pattern *regexp.Regexp
-	matched bool
 }
 
 // NewAfterRule creates a rule that turns printing on after the first matching line.
@@ -29,11 +28,11 @@ func (r *AfterRule) Setup(ctx *LineContext) {
 // Apply checks for a pattern match. On the line after a match, printing turns on.
 // The matching line itself stays off.
 func (r *AfterRule) Apply(line string, ctx *LineContext) ([]string, error) {
-	if r.matched {
+	if GetState(ctx, r, false) {
 		ctx.Printing = PrintOn
 	}
 	if r.pattern.MatchString(line) {
-		r.matched = true
+		SetState(ctx, r, true)
 	}
 	return []string{line}, nil
 }

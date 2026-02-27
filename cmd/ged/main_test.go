@@ -499,3 +499,63 @@ func TestRun_OnOffCombined(t *testing.T) {
 		t.Errorf("got %q, want %q", out.String(), want)
 	}
 }
+
+func TestRun_Between(t *testing.T) {
+	in := strings.NewReader("before\nSTART\n1\n2\nEND\nafter")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"between/START/END/", "{", "s/\\d/x/", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "before\nSTART\nx\nx\nEND\nafter\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_BetweenInverted(t *testing.T) {
+	in := strings.NewReader("x\nSTART\nx\nEND\nx")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"!between/START/END/", "{", "s/x/X/", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "X\nSTART\nx\nEND\nX\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_BetweenMultipleRanges(t *testing.T) {
+	in := strings.NewReader("x\nA\nx\nB\nx\nA\nx\nB\nx")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"between/A/B/", "{", "s/x/X/g", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "x\nA\nX\nB\nx\nA\nX\nB\nx\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_BetweenWithDocRule(t *testing.T) {
+	in := strings.NewReader("before\nSTART\nc\na\nb\nEND\nafter")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"between/START/END/", "{", "sort", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "before\nEND\nSTART\na\nb\nc\nafter\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
