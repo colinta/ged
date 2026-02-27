@@ -1,19 +1,20 @@
 package rule
 
-import "regexp"
+import "github.com/dlclark/regexp2"
 
 // PrintLineRule keeps lines that match a pattern, deletes non-matching lines.
 type PrintLineRule struct {
 	patternStr string
-	pattern    *regexp.Regexp
+	pattern    *regexp2.Regexp
 }
 
 // Pattern returns the original pattern string.
 func (r *PrintLineRule) Pattern() string { return r.patternStr }
 
 // NewPrintLineRule creates a rule that keeps only lines matching the pattern.
-func NewPrintLineRule(patternStr string) (*PrintLineRule, error) {
-	patternRegex, err := regexp.Compile(patternStr)
+// Use WithIgnoreCase() for case-insensitive matching.
+func NewPrintLineRule(patternStr string, opts ...RuleOption) (*PrintLineRule, error) {
+	patternRegex, err := CompilePattern(patternStr, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -25,7 +26,11 @@ func NewPrintLineRule(patternStr string) (*PrintLineRule, error) {
 
 // Apply returns the line if it matches, empty slice if not.
 func (r *PrintLineRule) Apply(line string, ctx *LineContext) ([]string, error) {
-	if r.pattern.MatchString(line) {
+	matched, err := r.pattern.MatchString(line)
+	if err != nil {
+		return nil, err
+	}
+	if matched {
 		return []string{line}, nil // Keep: line matches
 	}
 	return []string{}, nil // Delete: line doesn't match

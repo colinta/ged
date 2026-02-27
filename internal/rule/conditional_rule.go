@@ -1,18 +1,18 @@
 package rule
 
-import "regexp"
+import "github.com/dlclark/regexp2"
 
 // ConditionalLineRule implements LineRule. It applies inner LineRules only to
 // lines matching (or not matching) a condition. Non-matching lines pass through
 // unchanged. Because all inner rules are LineRules, this can stream.
 type ConditionalLineRule struct {
-	condition *regexp.Regexp
+	condition *regexp2.Regexp
 	inverted  bool
 	rules     []LineRule
 }
 
 // NewConditionalLineRule creates a ConditionalLineRule.
-func NewConditionalLineRule(condition *regexp.Regexp, inverted bool, rules []LineRule) *ConditionalLineRule {
+func NewConditionalLineRule(condition *regexp2.Regexp, inverted bool, rules []LineRule) *ConditionalLineRule {
 	return &ConditionalLineRule{
 		condition: condition,
 		inverted:  inverted,
@@ -22,7 +22,10 @@ func NewConditionalLineRule(condition *regexp.Regexp, inverted bool, rules []Lin
 
 // Apply checks the condition and either runs inner rules or passes the line through.
 func (r *ConditionalLineRule) Apply(line string, ctx *LineContext) ([]string, error) {
-	matches := r.condition.MatchString(line)
+	matches, err := r.condition.MatchString(line)
+	if err != nil {
+		return nil, err
+	}
 	if r.inverted {
 		matches = !matches
 	}
@@ -55,13 +58,13 @@ func (r *ConditionalLineRule) Apply(line string, ctx *LineContext) ([]string, er
 // then weaves the results back into the original positions. Non-matching lines
 // stay in place.
 type ConditionalDocRule struct {
-	condition *regexp.Regexp
+	condition *regexp2.Regexp
 	inverted  bool
 	rules     []DocumentRule
 }
 
 // NewConditionalDocRule creates a ConditionalDocRule.
-func NewConditionalDocRule(condition *regexp.Regexp, inverted bool, rules []DocumentRule) *ConditionalDocRule {
+func NewConditionalDocRule(condition *regexp2.Regexp, inverted bool, rules []DocumentRule) *ConditionalDocRule {
 	return &ConditionalDocRule{
 		condition: condition,
 		inverted:  inverted,
@@ -76,7 +79,10 @@ func (r *ConditionalDocRule) ApplyDocument(lines []string) ([]string, error) {
 	isMatch := make([]bool, len(lines))
 
 	for i, line := range lines {
-		matches := r.condition.MatchString(line)
+		matches, err := r.condition.MatchString(line)
+		if err != nil {
+			return nil, err
+		}
 		if r.inverted {
 			matches = !matches
 		}

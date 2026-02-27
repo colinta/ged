@@ -1,16 +1,17 @@
 package rule
 
-import "regexp"
+import "github.com/dlclark/regexp2"
 
 // OffRule stops printing when a line matches the pattern.
 // The matching line itself is not printed.
 type OffRule struct {
-	pattern *regexp.Regexp
+	pattern *regexp2.Regexp
 }
 
 // NewOffRule creates a rule that turns printing off at the first matching line.
-func NewOffRule(patternStr string) (*OffRule, error) {
-	pattern, err := regexp.Compile(patternStr)
+// Use WithIgnoreCase() for case-insensitive matching.
+func NewOffRule(patternStr string, opts ...RuleOption) (*OffRule, error) {
+	pattern, err := CompilePattern(patternStr, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +28,11 @@ func (r *OffRule) Setup(ctx *LineContext) {
 
 // Apply checks for a pattern match and turns printing off.
 func (r *OffRule) Apply(line string, ctx *LineContext) ([]string, error) {
-	if r.pattern.MatchString(line) {
+	matched, err := r.pattern.MatchString(line)
+	if err != nil {
+		return nil, err
+	}
+	if matched {
 		ctx.Printing = PrintOff
 	}
 	return []string{line}, nil

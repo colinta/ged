@@ -1,15 +1,16 @@
 package rule
 
-import "regexp"
+import "github.com/dlclark/regexp2"
 
 // ToggleRule flips the print state each time a line matches the pattern.
 type ToggleRule struct {
-	pattern *regexp.Regexp
+	pattern *regexp2.Regexp
 }
 
 // NewToggleRule creates a rule that toggles printing on each matching line.
-func NewToggleRule(patternStr string) (*ToggleRule, error) {
-	pattern, err := regexp.Compile(patternStr)
+// Use WithIgnoreCase() for case-insensitive matching.
+func NewToggleRule(patternStr string, opts ...RuleOption) (*ToggleRule, error) {
+	pattern, err := CompilePattern(patternStr, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -26,7 +27,11 @@ func (r *ToggleRule) Setup(ctx *LineContext) {
 
 // Apply flips the print state when the line matches.
 func (r *ToggleRule) Apply(line string, ctx *LineContext) ([]string, error) {
-	if r.pattern.MatchString(line) {
+	matched, err := r.pattern.MatchString(line)
+	if err != nil {
+		return nil, err
+	}
+	if matched {
 		if ctx.Printing == PrintOn {
 			ctx.Printing = PrintOff
 		} else {

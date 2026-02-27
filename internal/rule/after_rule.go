@@ -1,16 +1,17 @@
 package rule
 
-import "regexp"
+import "github.com/dlclark/regexp2"
 
 // AfterRule starts printing after a line matches the pattern.
 // The matching line itself is not printed — printing starts on the next line.
 type AfterRule struct {
-	pattern *regexp.Regexp
+	pattern *regexp2.Regexp
 }
 
 // NewAfterRule creates a rule that turns printing on after the first matching line.
-func NewAfterRule(patternStr string) (*AfterRule, error) {
-	pattern, err := regexp.Compile(patternStr)
+// Use WithIgnoreCase() for case-insensitive matching.
+func NewAfterRule(patternStr string, opts ...RuleOption) (*AfterRule, error) {
+	pattern, err := CompilePattern(patternStr, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +32,11 @@ func (r *AfterRule) Apply(line string, ctx *LineContext) ([]string, error) {
 	if GetState(ctx, r, false) {
 		ctx.Printing = PrintOn
 	}
-	if r.pattern.MatchString(line) {
+	matched, err := r.pattern.MatchString(line)
+	if err != nil {
+		return nil, err
+	}
+	if matched {
 		SetState(ctx, r, true)
 	}
 	return []string{line}, nil

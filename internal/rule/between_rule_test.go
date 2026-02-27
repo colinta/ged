@@ -1,15 +1,16 @@
 package rule
 
 import (
-	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/dlclark/regexp2"
 )
 
 func TestBetweenLineRule_AppliesInsideRange(t *testing.T) {
 	r := NewBetweenLineRule(
-		regexp.MustCompile("START"),
-		regexp.MustCompile("END"),
+		regexp2.MustCompile("START", 0),
+		regexp2.MustCompile("END", 0),
 		false,
 		[]LineRule{mustSub(t, "x", "X")},
 	)
@@ -23,8 +24,8 @@ func TestBetweenLineRule_AppliesInsideRange(t *testing.T) {
 
 func TestBetweenLineRule_StartLineIncluded(t *testing.T) {
 	r := NewBetweenLineRule(
-		regexp.MustCompile("START"),
-		regexp.MustCompile("END"),
+		regexp2.MustCompile("START", 0),
+		regexp2.MustCompile("END", 0),
 		false,
 		[]LineRule{mustSub(t, "^", "> ")},
 	)
@@ -38,8 +39,8 @@ func TestBetweenLineRule_StartLineIncluded(t *testing.T) {
 
 func TestBetweenLineRule_EndLineIncluded(t *testing.T) {
 	r := NewBetweenLineRule(
-		regexp.MustCompile("START"),
-		regexp.MustCompile("END"),
+		regexp2.MustCompile("START", 0),
+		regexp2.MustCompile("END", 0),
 		false,
 		[]LineRule{mustSub(t, "o", "0")},
 	)
@@ -53,8 +54,8 @@ func TestBetweenLineRule_EndLineIncluded(t *testing.T) {
 
 func TestBetweenLineRule_NoMatchPassesThrough(t *testing.T) {
 	r := NewBetweenLineRule(
-		regexp.MustCompile("START"),
-		regexp.MustCompile("END"),
+		regexp2.MustCompile("START", 0),
+		regexp2.MustCompile("END", 0),
 		false,
 		[]LineRule{mustSub(t, "x", "X")},
 	)
@@ -68,8 +69,8 @@ func TestBetweenLineRule_NoMatchPassesThrough(t *testing.T) {
 
 func TestBetweenLineRule_MultipleRanges(t *testing.T) {
 	r := NewBetweenLineRule(
-		regexp.MustCompile("START"),
-		regexp.MustCompile("END"),
+		regexp2.MustCompile("START", 0),
+		regexp2.MustCompile("END", 0),
 		false,
 		[]LineRule{mustSub(t, "x", "X")},
 	)
@@ -83,8 +84,8 @@ func TestBetweenLineRule_MultipleRanges(t *testing.T) {
 
 func TestBetweenLineRule_Inverted(t *testing.T) {
 	r := NewBetweenLineRule(
-		regexp.MustCompile("START"),
-		regexp.MustCompile("END"),
+		regexp2.MustCompile("START", 0),
+		regexp2.MustCompile("END", 0),
 		true,
 		[]LineRule{mustSub(t, "x", "X")},
 	)
@@ -99,8 +100,8 @@ func TestBetweenLineRule_Inverted(t *testing.T) {
 func TestBetweenLineRule_InnerDeleteRemovesLine(t *testing.T) {
 	del, _ := NewDeleteLineRule("middle")
 	r := NewBetweenLineRule(
-		regexp.MustCompile("START"),
-		regexp.MustCompile("END"),
+		regexp2.MustCompile("START", 0),
+		regexp2.MustCompile("END", 0),
 		false,
 		[]LineRule{del},
 	)
@@ -114,8 +115,8 @@ func TestBetweenLineRule_InnerDeleteRemovesLine(t *testing.T) {
 
 func TestBetweenLineRule_UnclosedRangeGoesToEnd(t *testing.T) {
 	r := NewBetweenLineRule(
-		regexp.MustCompile("START"),
-		regexp.MustCompile("END"),
+		regexp2.MustCompile("START", 0),
+		regexp2.MustCompile("END", 0),
 		false,
 		[]LineRule{mustSub(t, "x", "X")},
 	)
@@ -129,8 +130,8 @@ func TestBetweenLineRule_UnclosedRangeGoesToEnd(t *testing.T) {
 
 func TestBetweenDocRule_SortsInsideRange(t *testing.T) {
 	r := NewBetweenDocRule(
-		regexp.MustCompile("START"),
-		regexp.MustCompile("END"),
+		regexp2.MustCompile("START", 0),
+		regexp2.MustCompile("END", 0),
 		false,
 		[]DocumentRule{NewSortRule()},
 	)
@@ -147,8 +148,8 @@ func TestBetweenDocRule_SortsInsideRange(t *testing.T) {
 
 func TestBetweenDocRule_Inverted(t *testing.T) {
 	r := NewBetweenDocRule(
-		regexp.MustCompile("START"),
-		regexp.MustCompile("END"),
+		regexp2.MustCompile("START", 0),
+		regexp2.MustCompile("END", 0),
 		true,
 		[]DocumentRule{NewSortRule()},
 	)

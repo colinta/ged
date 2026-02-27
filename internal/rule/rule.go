@@ -1,6 +1,8 @@
 // Package rule defines the Rule interfaces and implementations for text transformation.
 package rule
 
+import "github.com/dlclark/regexp2"
+
 // PrintState controls whether lines are included in output.
 type PrintState int
 
@@ -64,4 +66,51 @@ type SetupRule interface {
 // the transformed document.
 type DocumentRule interface {
 	ApplyDocument(lines []string) ([]string, error)
+}
+
+// --- Shared rule options and pattern compilation ---
+
+// ruleConfig holds parsed option state used during rule construction.
+type ruleConfig struct {
+	ignoreCase bool
+	global     bool
+}
+
+// RuleOption configures rule behavior. Shared across all regex-based rules.
+// Options that don't apply to a particular rule are silently ignored.
+type RuleOption func(*ruleConfig)
+
+// WithIgnoreCase makes pattern matching case-insensitive.
+func WithIgnoreCase() RuleOption {
+	return func(c *ruleConfig) {
+		c.ignoreCase = true
+	}
+}
+
+// WithGlobal makes substitution replace all matches, not just the first.
+// Only meaningful for SubstitutionRule.
+func WithGlobal() RuleOption {
+	return func(c *ruleConfig) {
+		c.global = true
+	}
+}
+
+// buildConfig applies options and returns the resolved config.
+func buildConfig(opts []RuleOption) ruleConfig {
+	var cfg ruleConfig
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	return cfg
+}
+
+// CompilePattern compiles a regex pattern with ECMAScript mode enabled by default.
+// If the config includes ignoreCase, IgnoreCase is ORed into the options.
+func CompilePattern(pattern string, opts ...RuleOption) (*regexp2.Regexp, error) {
+	cfg := buildConfig(opts)
+	options := regexp2.RegexOptions(regexp2.ECMAScript)
+	if cfg.ignoreCase {
+		options |= regexp2.IgnoreCase
+	}
+	return regexp2.Compile(pattern, options)
 }

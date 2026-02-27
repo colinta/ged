@@ -18,7 +18,11 @@ func TestParseIf_Basic(t *testing.T) {
 	if cond.inverted {
 		t.Error("expected inverted=false")
 	}
-	if !cond.pattern.MatchString("hello world") {
+	matched, matchErr := cond.pattern.MatchString("hello world")
+	if matchErr != nil {
+		t.Fatalf("match error: %v", matchErr)
+	}
+	if !matched {
 		t.Error("pattern should match 'hello world'")
 	}
 }
@@ -47,10 +51,18 @@ func TestParseIf_LiteralDelimiter(t *testing.T) {
 		t.Fatalf("expected *condition, got %T", result)
 	}
 	// Literal: "foo.bar" should NOT match "fooXbar"
-	if cond.pattern.MatchString("fooXbar") {
+	matched1, err1 := cond.pattern.MatchString("fooXbar")
+	if err1 != nil {
+		t.Fatalf("match error: %v", err1)
+	}
+	if matched1 {
 		t.Error("literal pattern should not match 'fooXbar'")
 	}
-	if !cond.pattern.MatchString("foo.bar") {
+	matched2, err2 := cond.pattern.MatchString("foo.bar")
+	if err2 != nil {
+		t.Fatalf("match error: %v", err2)
+	}
+	if !matched2 {
 		t.Error("literal pattern should match 'foo.bar'")
 	}
 }

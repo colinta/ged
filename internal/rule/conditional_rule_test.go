@@ -1,15 +1,16 @@
 package rule
 
 import (
-	"regexp"
 	"testing"
+
+	"github.com/dlclark/regexp2"
 )
 
 // --- ConditionalLineRule tests ---
 
 func TestConditionalLineRule_MatchingLine(t *testing.T) {
 	sub, _ := NewSubstitutionRule("o", "x")
-	cond := NewConditionalLineRule(regexp.MustCompile("hello"), false, []LineRule{sub})
+	cond := NewConditionalLineRule(regexp2.MustCompile("hello", 0), false, []LineRule{sub})
 
 	result, err := cond.Apply("hello world", &LineContext{LineNum: 1})
 	if err != nil {
@@ -22,7 +23,7 @@ func TestConditionalLineRule_MatchingLine(t *testing.T) {
 
 func TestConditionalLineRule_NonMatchingLine(t *testing.T) {
 	sub, _ := NewSubstitutionRule("o", "x")
-	cond := NewConditionalLineRule(regexp.MustCompile("hello"), false, []LineRule{sub})
+	cond := NewConditionalLineRule(regexp2.MustCompile("hello", 0), false, []LineRule{sub})
 
 	result, err := cond.Apply("goodbye world", &LineContext{LineNum: 1})
 	if err != nil {
@@ -35,7 +36,7 @@ func TestConditionalLineRule_NonMatchingLine(t *testing.T) {
 
 func TestConditionalLineRule_Inverted(t *testing.T) {
 	sub, _ := NewSubstitutionRule("o", "x")
-	cond := NewConditionalLineRule(regexp.MustCompile("hello"), true, []LineRule{sub})
+	cond := NewConditionalLineRule(regexp2.MustCompile("hello", 0), true, []LineRule{sub})
 
 	// "hello" matches the pattern, so inverted means rules DON'T apply
 	result, err := cond.Apply("hello world", &LineContext{LineNum: 1})
@@ -60,7 +61,7 @@ func TestConditionalLineRule_Inverted(t *testing.T) {
 func TestConditionalLineRule_MultipleInnerRules(t *testing.T) {
 	sub1, _ := NewSubstitutionRule("a", "b")
 	sub2, _ := NewSubstitutionRule("b", "c")
-	cond := NewConditionalLineRule(regexp.MustCompile("x"), false, []LineRule{sub1, sub2})
+	cond := NewConditionalLineRule(regexp2.MustCompile("x", 0), false, []LineRule{sub1, sub2})
 
 	result, err := cond.Apply("xab", &LineContext{LineNum: 1})
 	if err != nil {
@@ -75,7 +76,7 @@ func TestConditionalLineRule_MultipleInnerRules(t *testing.T) {
 
 func TestConditionalLineRule_InnerDeleteRemovesLine(t *testing.T) {
 	del, _ := NewDeleteLineRule("hello")
-	cond := NewConditionalLineRule(regexp.MustCompile("hello"), false, []LineRule{del})
+	cond := NewConditionalLineRule(regexp2.MustCompile("hello", 0), false, []LineRule{del})
 
 	result, err := cond.Apply("hello world", &LineContext{LineNum: 1})
 	if err != nil {
@@ -88,7 +89,7 @@ func TestConditionalLineRule_InnerDeleteRemovesLine(t *testing.T) {
 
 func TestConditionalLineRule_PassesLineNum(t *testing.T) {
 	lineNumRule := NewPrintLineNumRule(SingleLine(3))
-	cond := NewConditionalLineRule(regexp.MustCompile(".*"), false, []LineRule{lineNumRule})
+	cond := NewConditionalLineRule(regexp2.MustCompile(".*", 0), false, []LineRule{lineNumRule})
 
 	// Line 3 should be kept
 	result, err := cond.Apply("hello", &LineContext{LineNum: 3})
@@ -114,7 +115,7 @@ func TestConditionalLineRule_PassesLineNum(t *testing.T) {
 func TestConditionalDocRule_SortMatchingLines(t *testing.T) {
 	// Sort only lines matching "item"
 	cond := NewConditionalDocRule(
-		regexp.MustCompile("item"),
+		regexp2.MustCompile("item", 0),
 		false,
 		[]DocumentRule{NewSortRule()},
 	)
@@ -138,7 +139,7 @@ func TestConditionalDocRule_SortMatchingLines(t *testing.T) {
 
 func TestConditionalDocRule_ReverseMatchingLines(t *testing.T) {
 	cond := NewConditionalDocRule(
-		regexp.MustCompile("x"),
+		regexp2.MustCompile("x", 0),
 		false,
 		[]DocumentRule{NewReverseRule()},
 	)
@@ -164,7 +165,7 @@ func TestConditionalDocRule_ReverseMatchingLines(t *testing.T) {
 func TestConditionalDocRule_JoinMatchingLines(t *testing.T) {
 	// Join reduces matching lines to one — extra matching positions are consumed
 	cond := NewConditionalDocRule(
-		regexp.MustCompile("item"),
+		regexp2.MustCompile("item", 0),
 		false,
 		[]DocumentRule{NewJoinRule(",")},
 	)
@@ -190,7 +191,7 @@ func TestConditionalDocRule_JoinMatchingLines(t *testing.T) {
 func TestConditionalDocRule_Inverted(t *testing.T) {
 	// Sort non-matching lines, leave matching ones in place
 	cond := NewConditionalDocRule(
-		regexp.MustCompile("KEEP"),
+		regexp2.MustCompile("KEEP", 0),
 		true,
 		[]DocumentRule{NewSortRule()},
 	)
@@ -215,7 +216,7 @@ func TestConditionalDocRule_Inverted(t *testing.T) {
 
 func TestConditionalDocRule_NoMatches(t *testing.T) {
 	cond := NewConditionalDocRule(
-		regexp.MustCompile("NOMATCH"),
+		regexp2.MustCompile("NOMATCH", 0),
 		false,
 		[]DocumentRule{NewSortRule()},
 	)
@@ -236,7 +237,7 @@ func TestConditionalDocRule_SubThenSort(t *testing.T) {
 	// Mix of line rules (wrapped in ApplyAllRule) and document rules
 	sub, _ := NewSubstitutionRule("item ", "")
 	cond := NewConditionalDocRule(
-		regexp.MustCompile("item"),
+		regexp2.MustCompile("item", 0),
 		false,
 		[]DocumentRule{NewApplyAllRule([]LineRule{sub}), NewSortRule()},
 	)

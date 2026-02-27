@@ -559,3 +559,110 @@ func TestRun_BetweenWithDocRule(t *testing.T) {
 		t.Errorf("got %q, want %q", out.String(), want)
 	}
 }
+
+// --- IgnoreCase flag tests ---
+
+func TestRun_SubstitutionIgnoreCase(t *testing.T) {
+	in := strings.NewReader("Hello World")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"s/hello/HI/i"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "HI World\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_SubstitutionIgnoreCaseGlobal(t *testing.T) {
+	in := strings.NewReader("Hello hello HELLO")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"s/hello/x/gi"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "x x x\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_PrintIgnoreCase(t *testing.T) {
+	in := strings.NewReader("Hello\nworld\nHELLO")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"p/hello/i"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "Hello\nHELLO\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_DeleteIgnoreCase(t *testing.T) {
+	in := strings.NewReader("Hello\nworld\nHELLO")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"d/hello/i"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "world\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_IfIgnoreCase(t *testing.T) {
+	in := strings.NewReader("Hello\nworld\nHELLO")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"if/hello/i", "{", "s/l/L/g", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "HeLLo\nworld\nHELLO\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_OnIgnoreCase(t *testing.T) {
+	in := strings.NewReader("a\nSTART\nb\nc")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"on/start/i"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "START\nb\nc\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_BetweenIgnoreCase(t *testing.T) {
+	in := strings.NewReader("before\nStart\n1\n2\nEnd\nafter")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"between/start/end/i", "{", "s/\\d/x/", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "before\nStart\nx\nx\nEnd\nafter\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}

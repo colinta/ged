@@ -3,10 +3,10 @@ package parser
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/colinta/ged/internal/rule"
+	"github.com/dlclark/regexp2"
 )
 
 // ParseRule parses a rule string and returns the appropriate Rule.
@@ -59,7 +59,7 @@ func ParseRule(input string) (any, error) {
 
 	// Quote delimiters mean literal matching — escape regex metacharacters
 	if (delimiter == '`' || delimiter == '\'' || delimiter == '"') && len(parts) > 0 {
-		parts[0] = regexp.QuoteMeta(parts[0])
+		parts[0] = regexp2.Escape(parts[0])
 	}
 
 	if command == 'p' && delimiter == ':' {
@@ -77,6 +77,33 @@ func ParseRule(input string) (any, error) {
 	} else {
 		return nil, fmt.Errorf("unknown command: %c", command)
 	}
+}
+
+// parseFlags reads a flags string and returns the corresponding RuleOptions.
+// Supported flags:
+//
+//	g — global replacement (SubstitutionRule only)
+//	i — case-insensitive matching
+func parseFlags(flags string) []rule.RuleOption {
+	var opts []rule.RuleOption
+	if strings.Contains(flags, "g") {
+		opts = append(opts, rule.WithGlobal())
+	}
+	if strings.Contains(flags, "i") {
+		opts = append(opts, rule.WithIgnoreCase())
+	}
+	return opts
+}
+
+// flagsFromParts extracts flags from the trailing element of a parts slice.
+// For commands like p/pat/ and d/pat/, flags are in parts[1].
+// For substitution s/pat/repl/flags, flags are in parts[2].
+// Returns the options parsed from the given index, or nil if index is out of range.
+func flagsFromParts(parts []string, flagIndex int) []rule.RuleOption {
+	if flagIndex < len(parts) {
+		return parseFlags(parts[flagIndex])
+	}
+	return nil
 }
 
 // parseJoin handles "join" (bare) and "join/sep/" syntax.
@@ -170,15 +197,7 @@ func parseSubstitution(parts []string) (*rule.SubstitutionRule, error) {
 
 	pattern := parts[0]
 	replace := parts[1]
-
-	// Parse flags (part 2 if present)
-	var opts []rule.SubstitutionOption
-	if len(parts) >= 3 {
-		flags := parts[2]
-		if strings.Contains(flags, "g") {
-			opts = append(opts, rule.WithGlobal())
-		}
-	}
+	opts := flagsFromParts(parts, 2)
 
 	return rule.NewSubstitutionRule(pattern, replace, opts...)
 }
@@ -203,7 +222,8 @@ func parsePrint(parts []string) (rule.LineRule, error) {
 		return nil, fmt.Errorf("print requires a pattern")
 	}
 
-	return rule.NewPrintLineRule(parts[0])
+	opts := flagsFromParts(parts, 1)
+	return rule.NewPrintLineRule(parts[0], opts...)
 }
 
 // parsePrintLineNum creates a PrintLineNumRule for line number filtering.
@@ -225,7 +245,8 @@ func parseDelete(parts []string) (rule.LineRule, error) {
 		return nil, fmt.Errorf("delete requires a pattern")
 	}
 
-	return rule.NewDeleteLineRule(parts[0])
+	opts := flagsFromParts(parts, 1)
+	return rule.NewDeleteLineRule(parts[0], opts...)
 }
 
 // parseDeleteLineNum creates a DeleteLineNumRule for line number filtering.
@@ -260,18 +281,20 @@ func parseControl(input string, name string) (rule.LineRule, error) {
 
 	pattern := parts[0]
 	if delimiter == '`' || delimiter == '\'' || delimiter == '"' {
-		pattern = regexp.QuoteMeta(pattern)
+		pattern = regexp2.Escape(pattern)
 	}
+
+	opts := flagsFromParts(parts, 1)
 
 	switch name {
 	case "on":
-		return rule.NewOnRule(pattern)
+		return rule.NewOnRule(pattern, opts...)
 	case "off":
-		return rule.NewOffRule(pattern)
+		return rule.NewOffRule(pattern, opts...)
 	case "after":
-		return rule.NewAfterRule(pattern)
+		return rule.NewAfterRule(pattern, opts...)
 	case "toggle":
-		return rule.NewToggleRule(pattern)
+		return rule.NewToggleRule(pattern, opts...)
 	default:
 		return nil, fmt.Errorf("unknown control command: %s", name)
 	}
@@ -281,7 +304,7 @@ func parseControl(input string, name string) (rule.LineRule, error) {
 // It's not a rule — it gets converted into a ConditionalRule once the inner
 // rules are collected from the { } block.
 type condition struct {
-	pattern  *regexp.Regexp
+	pattern  *regexp2.Regexp
 	inverted bool
 }
 
@@ -313,10 +336,11 @@ func parseIf(input string) (*condition, error) {
 
 	pattern := parts[0]
 	if delimiter == '`' || delimiter == '\'' || delimiter == '"' {
-		pattern = regexp.QuoteMeta(pattern)
+		pattern = regexp2.Escape(pattern)
 	}
 
-	compiled, err := regexp.Compile(pattern)
+	opts := flagsFromParts(parts, 1)
+	compiled, err := rule.CompilePattern(pattern, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("invalid pattern in if condition: %w", err)
 	}
@@ -330,8 +354,8 @@ func parseIf(input string) (*condition, error) {
 // betweenCondition is a parser-internal type representing a parsed between condition.
 // Like condition, it gets assembled with inner rules from { } blocks in parseArgs.
 type betweenCondition struct {
-	startPattern *regexp.Regexp
-	endPattern   *regexp.Regexp
+	startPattern *regexp2.Regexp
+	endPattern   *regexp2.Regexp
 	inverted     bool
 }
 
@@ -364,16 +388,17 @@ func parseBetween(input string) (*betweenCondition, error) {
 	startPattern := parts[0]
 	endPattern := parts[1]
 	if delimiter == '`' || delimiter == '\'' || delimiter == '"' {
-		startPattern = regexp.QuoteMeta(startPattern)
-		endPattern = regexp.QuoteMeta(endPattern)
+		startPattern = regexp2.Escape(startPattern)
+		endPattern = regexp2.Escape(endPattern)
 	}
 
-	startCompiled, err := regexp.Compile(startPattern)
+	opts := flagsFromParts(parts, 2)
+	startCompiled, err := rule.CompilePattern(startPattern, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("invalid start pattern in between: %w", err)
 	}
 
-	endCompiled, err := regexp.Compile(endPattern)
+	endCompiled, err := rule.CompilePattern(endPattern, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("invalid end pattern in between: %w", err)
 	}

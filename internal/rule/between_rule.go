@@ -1,6 +1,6 @@
 package rule
 
-import "regexp"
+import "github.com/dlclark/regexp2"
 
 // betweenState tracks whether we are currently inside a start/end range.
 type betweenState struct {
@@ -13,14 +13,14 @@ type betweenState struct {
 // State is stored on LineContext via GetState/SetState so the rule is reusable
 // across multiple documents.
 type BetweenLineRule struct {
-	startPattern *regexp.Regexp
-	endPattern   *regexp.Regexp
+	startPattern *regexp2.Regexp
+	endPattern   *regexp2.Regexp
 	inverted     bool
 	rules        []LineRule
 }
 
 // NewBetweenLineRule creates a BetweenLineRule.
-func NewBetweenLineRule(startPattern, endPattern *regexp.Regexp, inverted bool, rules []LineRule) *BetweenLineRule {
+func NewBetweenLineRule(startPattern, endPattern *regexp2.Regexp, inverted bool, rules []LineRule) *BetweenLineRule {
 	return &BetweenLineRule{
 		startPattern: startPattern,
 		endPattern:   endPattern,
@@ -35,9 +35,15 @@ func (r *BetweenLineRule) Apply(line string, ctx *LineContext) ([]string, error)
 	bs := GetState(ctx, r, betweenState{})
 
 	// Check for start/end transitions
-	if !bs.inside && r.startPattern.MatchString(line) {
-		bs.inside = true
-		SetState(ctx, r, bs)
+	if !bs.inside {
+		matched, err := r.startPattern.MatchString(line)
+		if err != nil {
+			return nil, err
+		}
+		if matched {
+			bs.inside = true
+			SetState(ctx, r, bs)
+		}
 	}
 
 	active := bs.inside
@@ -46,7 +52,14 @@ func (r *BetweenLineRule) Apply(line string, ctx *LineContext) ([]string, error)
 	}
 
 	// Check for end pattern before applying rules — the end line is still "inside"
-	closingThisLine := bs.inside && r.endPattern.MatchString(line)
+	closingThisLine := false
+	if bs.inside {
+		matched, err := r.endPattern.MatchString(line)
+		if err != nil {
+			return nil, err
+		}
+		closingThisLine = matched
+	}
 
 	var result []string
 	var err error
@@ -85,14 +98,14 @@ func (r *BetweenLineRule) Apply(line string, ctx *LineContext) ([]string, error)
 // ranges into a sub-document, applies inner DocumentRules to that sub-document,
 // then weaves the results back into their original positions.
 type BetweenDocRule struct {
-	startPattern *regexp.Regexp
-	endPattern   *regexp.Regexp
+	startPattern *regexp2.Regexp
+	endPattern   *regexp2.Regexp
 	inverted     bool
 	rules        []DocumentRule
 }
 
 // NewBetweenDocRule creates a BetweenDocRule.
-func NewBetweenDocRule(startPattern, endPattern *regexp.Regexp, inverted bool, rules []DocumentRule) *BetweenDocRule {
+func NewBetweenDocRule(startPattern, endPattern *regexp2.Regexp, inverted bool, rules []DocumentRule) *BetweenDocRule {
 	return &BetweenDocRule{
 		startPattern: startPattern,
 		endPattern:   endPattern,
@@ -109,8 +122,14 @@ func (r *BetweenDocRule) ApplyDocument(lines []string) ([]string, error) {
 	inside := false
 
 	for i, line := range lines {
-		if !inside && r.startPattern.MatchString(line) {
-			inside = true
+		if !inside {
+			matched, err := r.startPattern.MatchString(line)
+			if err != nil {
+				return nil, err
+			}
+			if matched {
+				inside = true
+			}
 		}
 
 		active := inside
@@ -123,8 +142,14 @@ func (r *BetweenDocRule) ApplyDocument(lines []string) ([]string, error) {
 			isActive[i] = true
 		}
 
-		if inside && r.endPattern.MatchString(line) {
-			inside = false
+		if inside {
+			matched, err := r.endPattern.MatchString(line)
+			if err != nil {
+				return nil, err
+			}
+			if matched {
+				inside = false
+			}
 		}
 	}
 

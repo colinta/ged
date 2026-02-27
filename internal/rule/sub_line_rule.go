@@ -1,14 +1,15 @@
 package rule
 
 import (
-	"regexp"
 	"strings"
+
+	"github.com/dlclark/regexp2"
 )
 
 // SubstitutionRule replaces text matching a pattern.
 type SubstitutionRule struct {
-	patternStr string         // original pattern string
-	pattern    *regexp.Regexp // compiled regex
+	patternStr string          // original pattern string
+	pattern    *regexp2.Regexp // compiled regex
 	replace    string
 	global     bool
 }
@@ -22,55 +23,33 @@ func (r *SubstitutionRule) Replace() string { return r.replace }
 // Global returns whether all matches are replaced.
 func (r *SubstitutionRule) Global() bool { return r.global }
 
-// SubstitutionOption configures a SubstitutionRule.
-type SubstitutionOption func(*SubstitutionRule)
-
-// WithGlobal makes the substitution replace all matches, not just the first.
-func WithGlobal() SubstitutionOption {
-	return func(r *SubstitutionRule) {
-		r.global = true
-	}
-}
-
 // NewSubstitutionRule creates a rule that replaces pattern matches with replacement text.
 // By default, only the first match is replaced. Use WithGlobal() to replace all matches.
-func NewSubstitutionRule(patternStr, replace string, opts ...SubstitutionOption) (*SubstitutionRule, error) {
-	patternRegex, err := regexp.Compile(patternStr)
+// Use WithIgnoreCase() for case-insensitive matching.
+func NewSubstitutionRule(patternStr, replace string, opts ...RuleOption) (*SubstitutionRule, error) {
+	cfg := buildConfig(opts)
+	patternRegex, err := CompilePattern(patternStr, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	r := &SubstitutionRule{
+	return &SubstitutionRule{
 		patternStr: patternStr,
 		pattern:    patternRegex,
 		replace:    replace,
-		global:     false,
-	}
-
-	for _, opt := range opts {
-		opt(r)
-	}
-
-	return r, nil
+		global:     cfg.global,
+	}, nil
 }
 
 // Apply performs the substitution on the given line.
 func (r *SubstitutionRule) Apply(line string, ctx *LineContext) ([]string, error) {
-	var result string
+	count := 1
 	if r.global {
-		result = r.pattern.ReplaceAllString(line, r.replace)
-	} else {
-		// Actually, the above is wrong - ReplaceAllStringFunc still replaces all.
-		// We need a different approach for first-only replacement.
-		loc := r.pattern.FindStringIndex(line)
-		if loc == nil {
-			result = line
-		} else {
-			prefix := line[:loc[0]]
-			postfix := line[loc[1]:]
-			middle := r.pattern.ReplaceAllString(line[loc[0]:loc[1]], r.replace)
-			result = prefix + middle + postfix
-		}
+		count = -1 // -1 means replace all
+	}
+	result, err := r.pattern.Replace(line, r.replace, 0, count)
+	if err != nil {
+		return nil, err
 	}
 
 	return strings.Split(result, "\n"), nil
