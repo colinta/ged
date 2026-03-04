@@ -18,12 +18,42 @@ You are a professional go developer and are teaching me the basics of Go by writ
 | 6 | ✅ Complete | Document rules (`sort`, `reverse`, `join`) |
 | 7 | ✅ Complete | Conditional rules (`if/pattern/ { rules }`) |
 | 7b | ✅ Complete | LineContext refactor + control flow rules (`on/off/after/toggle`) |
-| 8 | 🔲 Pending | Between condition (`between/start/end/ { rules }`) |
-| 9-12 | 🔲 Pending | File I/O, text modification, columns, extraction |
+| 8 | ✅ Complete | Between condition (`between/start/end/ { rules }`) |
+| 9 | ✅ Complete | File I/O (`--input`, `--write`, `--write-to`, `--`) |
+| 10-12 | 🔲 Pending | Text modification, columns, extraction |
 | 13 | ✅ Moved to 7b | Control flow rules (done early, needed LineContext) |
 | 14-20 | 🔲 Pending | External commands, diff/colors, more rules, polish |
 
-**To continue**: Run `go test ./...` to verify everything works, then start Phase 8.
+**To continue**: Run `go test ./...` to verify everything works, then start Phase 10.
+
+## Lesson Files
+
+Each phase introduces Go concepts. After completing a phase, create a lesson file in `lessons/` for each new concept covered. Lesson files are numbered sequentially across all phases (not per-phase). Each file should be 1–3 paragraphs with example code showing the concept in context. Follow the existing format in `lessons/`.
+
+**Current lessons** (from Phases 1–9):
+| File | Concept |
+|------|---------|
+| `01-packages-and-modules.md` | Package structure, `go mod init`, `internal/` |
+| `02-basic-types-and-errors.md` | Types, error interface, `%w` wrapping |
+| `03-interfaces.md` | Implicit conformance, small interfaces |
+| `04-io-reader-writer.md` | `io.Reader`/`io.Writer` for testable I/O |
+| `05-regexp.md` | `regexp` package, `QuoteMeta` |
+| `06-functional-options.md` | Variadic option functions for constructors |
+| `07-table-driven-tests.md` | `testing` package, `t.Run`, sub-tests |
+| `08-slices.md` | Dynamic arrays, `append`, nil vs empty |
+| `09-custom-types-with-methods.md` | Named types, method receivers |
+| `10-strconv.md` | `strconv.Atoi`, string↔int conversion |
+| `11-strings-builder.md` | `strings.Builder`, `Join`, `Split`, `TrimSpace` |
+| `12-sort-and-slices.md` | In-place sort/reverse, copy-first pattern |
+| `13-type-switches-and-any.md` | `any` return type, type switch dispatch |
+| `14-recursive-parsing.md` | Recursive descent, token threading |
+| `15-iota-enums.md` | `iota` constants, zero-value conventions |
+| `16-optional-interfaces.md` | Separate interfaces, type assertion checks |
+| `17-defer.md` | Deferred cleanup, LIFO order |
+| `18-file-io.md` | `os.Open`/`os.Create`, atomic write-back |
+| `19-shared-mutable-context.md` | Pointer-shared state across pipeline |
+
+**Next lesson number**: 20
 
 ## Project Structure
 
@@ -621,48 +651,67 @@ echo -e "start\n1\n2\nend\n3" | ged 'between/start/end/ { s/\d/x }'
 
 ---
 
-## Phase 9: File I/O
+## Phase 9: File I/O ✅ COMPLETE
 
 **Goal**: Support `--input=file` and `--write`
 
-**Go Concepts Introduced**:
-- `os.Open`, `os.Create`
-- `defer` for cleanup
-- `io.Reader` and `io.Writer` interfaces
-- Error wrapping with `fmt.Errorf`
-- File permissions
+**Go Concepts Learned**:
+- **`os.Open` / `os.Create`**: File opening returns `*os.File` which implements `io.Reader`/`io.Writer`
+- **`defer`**: Schedules cleanup (like `f.Close()`) to run when the function returns
+- **`os.CreateTemp` + `os.Rename`**: Safe atomic write pattern for in-place editing
+- **`os.Stat` / `os.Chmod`**: Preserving file permissions during write-back
+- **`filepath.Dir`**: Extracting directory from a path for temp file placement
+- **`strings.HasPrefix`**: Simple flag parsing without the `flag` package
 
-### Steps
+### Implementation Notes
 
-1. **Refactor engine to use io interfaces**
-   ```go
-   func (e *Engine) Process(r io.Reader, w io.Writer) error
-   ```
+**CLI Options Parsing**: `parseCliOptions` separates flags from rule args:
+- `--input=FILE` — read from file (repeatable for multiple files)
+- `--write` — overwrite input files in place (requires `--input`)
+- `--write-to=FILE` — write output to specific file
+- `--` — everything after is a rule argument (not a flag)
 
-2. **Implement CLI flags**
-   - `--input=file` or positional argument
-   - `--write` for in-place editing
-   - `--write-to=file` for explicit output
+**Architecture Refactor**: Extracted `processStream()` as the core processing function that takes `io.Reader`/`io.Writer`. Both stdin and file inputs use this same function. `processFile()` handles file opening, and `writeBack()` handles the temp-file-then-rename pattern.
 
-3. **Add backup support**
-   - `--write-rename=%.backup` creates backup first
+**Atomic Write**: `writeBack` writes to a temp file in the same directory as the target, then uses `os.Rename` for an atomic swap. This prevents data loss if the program crashes mid-write. File permissions are preserved via `os.Stat`/`os.Chmod`.
 
-4. **Handle multiple input files**
-   - Process each file separately
-   - Support `--ls` mode (filenames from stdin)
+**Validation**: Mutually exclusive flags are caught early:
+- `--write` requires `--input`
+- `--write` and `--write-to` can't be used together
+- `--write-to` can't be used with multiple input files
 
-### Tests to Write
-- [ ] Read from file works
-- [ ] Write to stdout by default
-- [ ] Write in-place with --write
-- [ ] Write to different file works
-- [ ] Backup before writing works
-- [ ] Multiple input files process separately
-- [ ] ls mode processes each filename
+### Tests Written
+- [x] Read from file with `--input=`
+- [x] File not found returns error
+- [x] Write in-place with `--write`
+- [x] Write-back preserves file permissions
+- [x] `--write-to=` writes to specific file, leaves original unchanged
+- [x] `--write-to=` works with stdin (no `--input`)
+- [x] `--write` without `--input` errors
+- [x] `--write` + `--write-to` errors (mutually exclusive)
+- [x] Multiple input files output to stdout
+- [x] Multiple input files with `--write` updates each
+- [x] Multiple input files with `--write-to` errors
+- [x] Bare rules after `--` (not treated as flags)
+- [x] File input with document rules (sort)
 
-### Deliverable
+### Files Modified
+- `cmd/ged/main.go` — Added `cliOptions`, `parseCliOptions`, `processStream`, `processFile`, `writeBack`, `readLines`, `applyDocRules`; refactored `run()` to use them
+- `cmd/ged/main_test.go` — Added 13 file I/O tests
+
+### Deliverable ✅
 ```bash
 ged 's/foo/bar' --input=test.txt --write
+# Transforms test.txt in place
+
+ged 's/foo/bar' --input=test.txt --write-to=output.txt
+# Writes to output.txt, leaves test.txt unchanged
+
+ged 's/foo/bar' --input=a.txt --input=b.txt
+# Processes both files, outputs to stdout
+
+ged -- 's/--flag/value/'
+# Everything after -- is a rule, even if it looks like a flag
 ```
 
 ---

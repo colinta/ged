@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -662,6 +664,311 @@ func TestRun_BetweenIgnoreCase(t *testing.T) {
 	}
 
 	want := "before\nStart\nx\nx\nEnd\nafter\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+// --- File I/O tests ---
+
+// writeTestFile creates a temporary file with the given content and returns its path.
+// The file is automatically cleaned up when the test finishes.
+func writeTestFile(t *testing.T, content string) string {
+	t.Helper()
+	f, err := os.CreateTemp(t.TempDir(), "ged-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(content); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	f.Close()
+	return f.Name()
+}
+
+func TestRun_InputFile(t *testing.T) {
+	path := writeTestFile(t, "hello world\n")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"s/world/earth", "--input=" + path}, nil, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "hello earth\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_InputFileNotFound(t *testing.T) {
+	out := &bytes.Buffer{}
+
+	err := run([]string{"s/a/b", "--input=/nonexistent/file.txt"}, nil, out, io.Discard)
+	if err == nil {
+		t.Error("expected error for missing input file, got nil")
+	}
+}
+
+func TestRun_WriteBack(t *testing.T) {
+	path := writeTestFile(t, "hello world\n")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"s/world/earth", "--input=" + path, "--write"}, nil, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// stdout should be empty (output went to file)
+	if out.String() != "" {
+		t.Errorf("expected no stdout, got %q", out.String())
+	}
+
+	// File should be updated
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "hello earth\n"
+	if string(data) != want {
+		t.Errorf("file content: got %q, want %q", string(data), want)
+	}
+}
+
+func TestRun_WriteBackPreservesPermissions(t *testing.T) {
+	path := writeTestFile(t, "hello\n")
+	os.Chmod(path, 0755)
+	out := &bytes.Buffer{}
+
+	err := run([]string{"s/hello/world", "--input=" + path, "--write"}, nil, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0755 {
+		t.Errorf("permissions: got %o, want 0755", info.Mode().Perm())
+	}
+}
+
+func TestRun_WriteTo(t *testing.T) {
+	inPath := writeTestFile(t, "hello world\n")
+	outPath := filepath.Join(t.TempDir(), "output.txt")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"s/world/earth", "--input=" + inPath, "--write-to=" + outPath}, nil, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Original should be unchanged
+	orig, _ := os.ReadFile(inPath)
+	if string(orig) != "hello world\n" {
+		t.Errorf("original changed: %q", string(orig))
+	}
+
+	// Output file should have transformed content
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "hello earth\n"
+	if string(data) != want {
+		t.Errorf("output file: got %q, want %q", string(data), want)
+	}
+}
+
+func TestRun_WriteToFromStdin(t *testing.T) {
+	outPath := filepath.Join(t.TempDir(), "output.txt")
+	in := strings.NewReader("hello world\n")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"s/world/earth", "--write-to=" + outPath}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "hello earth\n"
+	if string(data) != want {
+		t.Errorf("output file: got %q, want %q", string(data), want)
+	}
+}
+
+func TestRun_WriteRequiresInput(t *testing.T) {
+	err := run([]string{"s/a/b", "--write"}, nil, &bytes.Buffer{}, io.Discard)
+	if err == nil {
+		t.Error("expected error for --write without --input, got nil")
+	}
+}
+
+func TestRun_WriteAndWriteToMutuallyExclusive(t *testing.T) {
+	path := writeTestFile(t, "hello\n")
+	err := run([]string{"s/a/b", "--input=" + path, "--write", "--write-to=out.txt"}, nil, &bytes.Buffer{}, io.Discard)
+	if err == nil {
+		t.Error("expected error for --write + --write-to, got nil")
+	}
+}
+
+func TestRun_MultipleInputFiles(t *testing.T) {
+	path1 := writeTestFile(t, "aaa\n")
+	path2 := writeTestFile(t, "bbb\n")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"s/a/x/g", "s/b/y/g", "--input=" + path1, "--input=" + path2}, nil, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "xxx\nyyy\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_MultipleInputFilesWriteBack(t *testing.T) {
+	path1 := writeTestFile(t, "aaa\n")
+	path2 := writeTestFile(t, "bbb\n")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"s/a/x/g", "s/b/y/g", "--input=" + path1, "--input=" + path2, "--write"}, nil, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data1, _ := os.ReadFile(path1)
+	data2, _ := os.ReadFile(path2)
+	if string(data1) != "xxx\n" {
+		t.Errorf("file1: got %q, want %q", string(data1), "xxx\n")
+	}
+	if string(data2) != "yyy\n" {
+		t.Errorf("file2: got %q, want %q", string(data2), "yyy\n")
+	}
+}
+
+func TestRun_MultipleInputFilesWriteToError(t *testing.T) {
+	path1 := writeTestFile(t, "a\n")
+	path2 := writeTestFile(t, "b\n")
+	err := run([]string{"s/a/b", "--input=" + path1, "--input=" + path2, "--write-to=out.txt"}, nil, &bytes.Buffer{}, io.Discard)
+	if err == nil {
+		t.Error("expected error for --write-to with multiple inputs, got nil")
+	}
+}
+
+func TestRun_InputSpaceSeparated(t *testing.T) {
+	path := writeTestFile(t, "hello world\n")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"s/world/earth", "--input", path}, nil, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "hello earth\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_InputSpaceSeparatedMultiple(t *testing.T) {
+	path1 := writeTestFile(t, "aaa\n")
+	path2 := writeTestFile(t, "bbb\n")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"s/a/x/g", "s/b/y/g", "--input", path1, "--input", path2}, nil, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "xxx\nyyy\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_InputMissingFilename(t *testing.T) {
+	err := run([]string{"s/a/b", "--input"}, nil, &bytes.Buffer{}, io.Discard)
+	if err == nil {
+		t.Error("expected error for --input without filename, got nil")
+	}
+}
+
+func TestRun_WriteToSpaceSeparated(t *testing.T) {
+	inPath := writeTestFile(t, "hello world\n")
+	outPath := filepath.Join(t.TempDir(), "output.txt")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"s/world/earth", "--input", inPath, "--write-to", outPath}, nil, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "hello earth\n"
+	if string(data) != want {
+		t.Errorf("output file: got %q, want %q", string(data), want)
+	}
+}
+
+func TestRun_WriteToMissingFilename(t *testing.T) {
+	err := run([]string{"s/a/b", "--write-to"}, nil, &bytes.Buffer{}, io.Discard)
+	if err == nil {
+		t.Error("expected error for --write-to without filename, got nil")
+	}
+}
+
+func TestRun_BareRulesAfterDash(t *testing.T) {
+	input := strings.NewReader("hello world\n")
+	out := &bytes.Buffer{}
+
+	// "--" prevents "--write" from being treated as a flag
+	err := run([]string{"--", "s/world/earth"}, input, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "hello earth\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_BareRulesAfterDash_FlagLikeRule(t *testing.T) {
+	input := strings.NewReader("--write\n--input=foo\n")
+	out := &bytes.Buffer{}
+
+	// Rule args after -- that look like flags should be treated as rules
+	err := run([]string{"--", "s/--/++/"}, input, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "++write\n++input=foo\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_InputFileWithSort(t *testing.T) {
+	path := writeTestFile(t, "c\na\nb\n")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"sort", "--input=" + path}, nil, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "a\nb\nc\n"
 	if out.String() != want {
 		t.Errorf("got %q, want %q", out.String(), want)
 	}
