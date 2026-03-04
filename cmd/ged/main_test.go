@@ -1562,3 +1562,115 @@ func TestRun_XargsInsideIf(t *testing.T) {
 		t.Errorf("got %q, want %q", out.String(), want)
 	}
 }
+
+func TestRun_DiffMode(t *testing.T) {
+	in := strings.NewReader("hello\nworld\nhello")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"--diff", "--no-color", "s/hello/goodbye/"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := out.String()
+	if !strings.Contains(got, "-hello") {
+		t.Errorf("expected '-hello' in diff output, got:\n%s", got)
+	}
+	if !strings.Contains(got, "+goodbye") {
+		t.Errorf("expected '+goodbye' in diff output, got:\n%s", got)
+	}
+	if !strings.Contains(got, " world") {
+		t.Errorf("expected ' world' (unchanged) in diff output, got:\n%s", got)
+	}
+}
+
+func TestRun_DiffNoChanges(t *testing.T) {
+	in := strings.NewReader("hello\nworld")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"--diff", "--no-color", "s/nomatch/x/"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if out.String() != "" {
+		t.Errorf("expected empty output for no changes, got %q", out.String())
+	}
+}
+
+func TestRun_DiffWithFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.txt")
+	os.WriteFile(path, []byte("foo\nbar\nbaz\n"), 0644)
+
+	out := &bytes.Buffer{}
+	err := run([]string{"--diff", "--no-color", "--input=" + path, "s/bar/BAR/"}, nil, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := out.String()
+	if !strings.Contains(got, "--- "+path) {
+		t.Errorf("expected header with filename, got:\n%s", got)
+	}
+	if !strings.Contains(got, "-bar") {
+		t.Errorf("expected '-bar' in diff output, got:\n%s", got)
+	}
+	if !strings.Contains(got, "+BAR") {
+		t.Errorf("expected '+BAR' in diff output, got:\n%s", got)
+	}
+}
+
+func TestRun_DiffWithColor(t *testing.T) {
+	in := strings.NewReader("hello\nworld")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"--diff", "--color", "s/hello/goodbye/"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := out.String()
+	if !strings.Contains(got, "\033[31m") {
+		t.Errorf("expected red ANSI code in colored diff, got:\n%s", got)
+	}
+	if !strings.Contains(got, "\033[32m") {
+		t.Errorf("expected green ANSI code in colored diff, got:\n%s", got)
+	}
+}
+
+func TestRun_DiffWriteMutuallyExclusive(t *testing.T) {
+	err := run([]string{"--diff", "--write", "--input=foo.txt", "s/a/b/"}, nil, io.Discard, io.Discard)
+	if err == nil {
+		t.Fatal("expected error for --diff + --write")
+	}
+	if !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Errorf("expected mutually exclusive error, got: %v", err)
+	}
+}
+
+func TestRun_DiffWriteToMutuallyExclusive(t *testing.T) {
+	err := run([]string{"--diff", "--write-to=out.txt", "s/a/b/"}, nil, io.Discard, io.Discard)
+	if err == nil {
+		t.Fatal("expected error for --diff + --write-to")
+	}
+	if !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Errorf("expected mutually exclusive error, got: %v", err)
+	}
+}
+
+func TestRun_ColorAutoDetectsNonTerminal(t *testing.T) {
+	// When output is a bytes.Buffer (not a terminal), auto should mean no color
+	in := strings.NewReader("hello\nworld")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"--diff", "s/hello/goodbye/"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := out.String()
+	if strings.Contains(got, "\033[") {
+		t.Errorf("expected no ANSI codes in auto mode with non-terminal output, got:\n%s", got)
+	}
+}

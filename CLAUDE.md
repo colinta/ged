@@ -25,9 +25,10 @@ You are a professional go developer and are teaching me the basics of Go by writ
 | 12 | ✅ Complete | Extraction rules |
 | 13 | ✅ Moved to 7b | Control flow rules (done early, needed LineContext) |
 | 14 | ✅ Complete | External commands (`xargs`, `exec`) |
-| 15-20 | 🔲 Pending | Diff/colors, more rules, polish |
+| 15 | ✅ Complete | Diff output and colors (`--diff`, `--color`, `--no-color`) |
+| 16-20 | 🔲 Pending | More rules, polish |
 
-**To continue**: Run `go test ./...` to verify everything works, then start Phase 15.
+**To continue**: Run `go test ./...` to verify everything works, then start Phase 16.
 
 ## Lesson Files
 
@@ -61,8 +62,10 @@ Each phase introduces Go concepts. After completing a phase, create a lesson fil
 | `23-regex-match-groups.md` | `FindStringMatch`, `Groups()`, iterating matches |
 
 | `24-os-exec.md` | `os/exec`, `exec.Command`, shell quoting, stdin/stdout wiring |
+| `25-ansi-colors-and-tty-detection.md` | ANSI escape codes, `ModeCharDevice` TTY detection without external deps |
+| `26-lcs-diff-algorithm.md` | Longest Common Subsequence, dynamic programming, backtracking |
 
-**Next lesson number**: 25
+**Next lesson number**: 27
 
 ## Project Structure
 
@@ -105,6 +108,9 @@ ged/
 │   │   ├── parser.go            # Rule parsing (single rules + control rules)
 │   │   ├── parse_args.go        # Multi-arg parsing with { } blocks
 │   │   └── *_test.go
+│   ├── diff/
+│   │   ├── diff.go              # LCS diff algorithm, Format, HasChanges
+│   │   └── diff_test.go
 │   └── engine/
 │       ├── pipeline.go          # Processing pipeline
 │       └── pipeline_test.go
@@ -1023,38 +1029,67 @@ echo -e "3\n1\n2" | ged 's/$/x/' 'exec/sort/'
 
 ---
 
-## Phase 15: Diff Output and Colors
+## Phase 15: Diff Output and Colors ✅ COMPLETE
 
 **Goal**: Implement `--diff` mode and colored output
 
-**Go Concepts Introduced**:
-- ANSI escape codes
-- Terminal detection (`os.IsTerminal`)
-- Diff algorithms (or use a library)
-- Optional dependencies
+**Go Concepts Learned**:
+- **ANSI escape codes**: `\033[31m` (red), `\033[32m` (green), `\033[1m` (bold), `\033[0m` (reset)
+- **TTY detection without external deps**: `os.File.Stat()` + `ModeCharDevice` bit check
+- **LCS diff algorithm**: Dynamic programming O(n×m) table + backtracking to produce insert/delete/equal changes
+- **Bitwise AND**: `info.Mode()&os.ModeCharDevice != 0` checks a single bit in file mode
 
-### Steps
+### Implementation Notes
 
-1. **Implement diff generation**
-   - Compare original vs transformed
-   - Generate unified diff format
+**Diff Package** (`internal/diff/`): Standalone package with three functions:
+- `Compute(a, b []string) []Change` — LCS-based diff producing Equal/Insert/Delete changes
+- `Format(changes, color) []string` — renders changes with `+`/`-`/` ` prefixes, optional ANSI colors
+- `HasChanges(changes) bool` — quick check for any non-Equal changes
 
-2. **Add color support**
-   - Detect if stdout is a TTY
-   - `--color` and `--no-color` flags
-   - Color additions green, deletions red
+**CLI Flags**:
+- `--diff` — show diff instead of transformed output. Mutually exclusive with `--write`/`--write-to`
+- `--color` — force colors on
+- `--no-color` — force colors off
+- Default: auto-detect from `os.ModeCharDevice` (no `golang.org/x/term` needed)
 
-### Tests to Write
-- [ ] Diff shows changes correctly
-- [ ] Diff context lines configurable
-- [ ] Colors applied when enabled
-- [ ] Colors disabled on non-TTY
-- [ ] --no-color flag works
+**No-change behavior**: If the transformation produces identical output, `--diff` prints nothing (clean exit).
 
-### Deliverable
+**File headers**: When `--input` is used with `--diff`, each file gets a `--- filename` / `+++ filename` header (bold when colored).
+
+### Tests Written
+- [x] LCS: identical, insertion, deletion, substitution, all different
+- [x] LCS: empty original, empty result, both empty, multiple changes
+- [x] Format without color: correct `+`/`-`/` ` prefixes
+- [x] Format with color: ANSI codes present
+- [x] HasChanges: true for inserts/deletes, false for all-equal
+- [x] CLI: --diff shows changes (stdin)
+- [x] CLI: --diff no changes = empty output
+- [x] CLI: --diff with --input shows file header
+- [x] CLI: --diff --color forces ANSI codes
+- [x] CLI: --diff auto-detects no color for non-terminal
+- [x] CLI: --diff + --write errors (mutually exclusive)
+- [x] CLI: --diff + --write-to errors (mutually exclusive)
+
+### Files Created
+- `internal/diff/diff.go` — Compute, Format, HasChanges
+- `internal/diff/diff_test.go` — 13 tests
+- `lessons/25-ansi-colors-and-tty-detection.md`
+- `lessons/26-lcs-diff-algorithm.md`
+
+### Files Modified
+- `cmd/ged/main.go` — Added `--diff`, `--color`, `--no-color` flags; `resolveColor`, `runDiff`, `writeDiff`
+- `cmd/ged/main_test.go` — 7 CLI integration tests
+
+### Deliverable ✅
 ```bash
-ged 's/foo/bar' --input=file.txt --diff
-# Shows unified diff output
+echo -e "hello\nworld" | ged --diff 's/hello/goodbye/'
+# Output: -hello\n+goodbye\n world
+
+ged --diff --color --input=file.txt 's/foo/bar/'
+# Shows colored unified diff with file header
+
+echo "unchanged" | ged --diff 's/nomatch/x/'
+# (no output — nothing changed)
 ```
 
 ---

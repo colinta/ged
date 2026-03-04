@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/colinta/ged/internal/diff"
 	"github.com/colinta/ged/internal/engine"
 	"github.com/colinta/ged/internal/parser"
 	"github.com/colinta/ged/internal/rule"
@@ -20,12 +21,23 @@ func main() {
 	}
 }
 
+// colorMode represents the user's color preference.
+type colorMode int
+
+const (
+	colorAuto colorMode = iota // detect from terminal
+	colorOn                    // always use colors
+	colorOff                   // never use colors
+)
+
 // cliOptions holds parsed CLI flags separate from rule arguments.
 type cliOptions struct {
-	inputFiles []string // --input=file
-	writeback  bool     // --write: overwrite input file in place
-	writeTo    string   // --write-to=file: explicit output file
-	ruleArgs   []string // remaining args that are rules
+	inputFiles []string  // --input=file
+	writeback  bool      // --write: overwrite input file in place
+	writeTo    string    // --write-to=file: explicit output file
+	diffMode   bool      // --diff: show diff instead of output
+	color      colorMode // --color / --no-color
+	ruleArgs   []string  // remaining args that are rules
 }
 
 // parseCliOptions separates CLI flags from rule arguments.
@@ -51,6 +63,21 @@ func parseCliOptions(args []string) (*cliOptions, error) {
 
 		if arg == "--" {
 			bareRules = true
+			continue
+		}
+
+		if arg == "--diff" {
+			opts.diffMode = true
+			continue
+		}
+
+		if arg == "--color" {
+			opts.color = colorOn
+			continue
+		}
+
+		if arg == "--no-color" {
+			opts.color = colorOff
 			continue
 		}
 
@@ -98,6 +125,12 @@ func parseCliOptions(args []string) (*cliOptions, error) {
 	if opts.writeTo != "" && len(opts.inputFiles) > 1 {
 		return nil, fmt.Errorf("--write-to cannot be used with multiple input files")
 	}
+	if opts.diffMode && opts.writeback {
+		return nil, fmt.Errorf("--diff and --write are mutually exclusive")
+	}
+	if opts.diffMode && opts.writeTo != "" {
+		return nil, fmt.Errorf("--diff and --write-to are mutually exclusive")
+	}
 
 	return opts, nil
 }
@@ -120,6 +153,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		return fmt.Errorf("error parsing rules: %w", err)
 	}
 
+	// Resolve color: auto-detect from stdout if possible
+	useColor := resolveColor(opts.color, stdout)
+
+	// Diff mode: compare original vs transformed
+	if opts.diffMode {
+		return runDiff(allParsed, opts, stdin, stdout, useColor)
+	}
+
 	// No input files — use stdin/stdout as before
 	if len(opts.inputFiles) == 0 {
 		output := stdout
@@ -139,6 +180,87 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		if err := processFile(allParsed, inputFile, stdout, opts); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// resolveColor determines whether to use colors based on mode and output target.
+func resolveColor(mode colorMode, output io.Writer) bool {
+	switch mode {
+	case colorOn:
+		return true
+	case colorOff:
+		return false
+	default: // colorAuto
+		// Check if output is an *os.File pointing to a character device (terminal).
+		// This avoids the golang.org/x/term dependency — os.File.Stat() returns
+		// a FileInfo whose Mode() includes ModeCharDevice for TTYs.
+		if f, ok := output.(*os.File); ok {
+			info, err := f.Stat()
+			if err == nil {
+				return info.Mode()&os.ModeCharDevice != 0
+			}
+		}
+		return false
+	}
+}
+
+// runDiff processes input in diff mode: shows changes instead of writing output.
+func runDiff(allParsed []any, opts *cliOptions, stdin io.Reader, stdout io.Writer, useColor bool) error {
+	if len(opts.inputFiles) == 0 {
+		// stdin mode: read all, transform, diff
+		original, err := readLines(stdin)
+		if err != nil {
+			return err
+		}
+		transformed, err := applyDocRules(allParsed, original)
+		if err != nil {
+			return err
+		}
+		return writeDiff(original, transformed, "", stdout, useColor)
+	}
+
+	// File mode: diff each file
+	for _, inputFile := range opts.inputFiles {
+		f, err := os.Open(inputFile)
+		if err != nil {
+			return fmt.Errorf("error opening %s: %w", inputFile, err)
+		}
+		original, err := readLines(f)
+		f.Close()
+		if err != nil {
+			return err
+		}
+		transformed, err := applyDocRules(allParsed, original)
+		if err != nil {
+			return err
+		}
+		if err := writeDiff(original, transformed, inputFile, stdout, useColor); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// writeDiff computes and prints a diff between original and transformed lines.
+func writeDiff(original, transformed []string, filename string, output io.Writer, useColor bool) error {
+	changes := diff.Compute(original, transformed)
+	if !diff.HasChanges(changes) {
+		return nil // no output if nothing changed
+	}
+
+	// Print header if we have a filename
+	if filename != "" {
+		header := fmt.Sprintf("--- %s\n+++ %s", filename, filename)
+		if useColor {
+			header = "\033[1m" + header + "\033[0m"
+		}
+		fmt.Fprintln(output, header)
+	}
+
+	lines := diff.Format(changes, useColor)
+	for _, line := range lines {
+		fmt.Fprintln(output, line)
 	}
 	return nil
 }
