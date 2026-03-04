@@ -20,11 +20,14 @@ You are a professional go developer and are teaching me the basics of Go by writ
 | 7b | ✅ Complete | LineContext refactor + control flow rules (`on/off/after/toggle`) |
 | 8 | ✅ Complete | Between condition (`between/start/end/ { rules }`) |
 | 9 | ✅ Complete | File I/O (`--input`, `--write`, `--write-to`, `--`) |
-| 10-12 | 🔲 Pending | Text modification, columns, extraction |
+| 10 | ✅ Complete | Text modification (`trim`, `upper`, `lower`, `prepend`, `append`, `surround`) |
+| 11 | ✅ Complete | Column operations (`cols`) |
+| 12 | ✅ Complete | Extraction rules |
 | 13 | ✅ Moved to 7b | Control flow rules (done early, needed LineContext) |
-| 14-20 | 🔲 Pending | External commands, diff/colors, more rules, polish |
+| 14 | ✅ Complete | External commands (`xargs`, `exec`) |
+| 15-20 | 🔲 Pending | Diff/colors, more rules, polish |
 
-**To continue**: Run `go test ./...` to verify everything works, then start Phase 10.
+**To continue**: Run `go test ./...` to verify everything works, then start Phase 15.
 
 ## Lesson Files
 
@@ -52,8 +55,14 @@ Each phase introduces Go concepts. After completing a phase, create a lesson fil
 | `17-defer.md` | Deferred cleanup, LIFO order |
 | `18-file-io.md` | `os.Open`/`os.Create`, atomic write-back |
 | `19-shared-mutable-context.md` | Pointer-shared state across pipeline |
+| `20-string-transforms.md` | `TrimSpace`, `ToUpper`, `ToLower`, simple concatenation |
+| `21-regex-split.md` | Splitting strings by regex pattern with match iteration |
+| `22-index-resolution.md` | 1-based/negative index resolution, `(int, bool)` pattern |
+| `23-regex-match-groups.md` | `FindStringMatch`, `Groups()`, iterating matches |
 
-**Next lesson number**: 20
+| `24-os-exec.md` | `os/exec`, `exec.Command`, shell quoting, stdin/stdout wiring |
+
+**Next lesson number**: 25
 
 ## Project Structure
 
@@ -82,6 +91,15 @@ ged/
 │   │   ├── off_rule.go          # OffRule (control flow)
 │   │   ├── after_rule.go        # AfterRule (control flow)
 │   │   ├── toggle_rule.go       # ToggleRule (control flow)
+│   │   ├── trim_rule.go         # TrimRule (both/left/right)
+│   │   ├── case_rule.go         # UpperRule, LowerRule
+│   │   ├── text_rule.go         # PrependRule, AppendRule, SurroundRule
+│   │   ├── columns_rule.go     # ColumnsRule, ColumnSpec, regexSplit
+│   │   ├── take_rule.go         # TakeRule (extract matching portion)
+│   │   ├── remove_rule.go       # RemoveRule (remove matching portion)
+│   │   ├── group_rule.go        # GroupRule (extract capture group)
+│   │   ├── xargs_rule.go       # XargsRule (execute command per line)
+│   │   ├── exec_rule.go        # ExecRule (pipe document through command)
 │   │   └── *_test.go            # Tests for each
 │   ├── parser/
 │   │   ├── parser.go            # Rule parsing (single rules + control rules)
@@ -716,113 +734,208 @@ ged -- 's/--flag/value/'
 
 ---
 
-## Phase 10: Text Modification Rules
+## Phase 10: Text Modification Rules ✅ COMPLETE
 
-**Goal**: Implement `trim`, `prepend`, `append`, `surround`, `quote`, `unquote`
+**Goal**: Implement `trim`, `triml`, `trimr`, `upper`, `lower`, `prepend`, `append`, `surround`
 
-**Go Concepts Introduced**:
-- `strings.TrimSpace`, `strings.TrimLeft`, `strings.TrimRight`
-- String concatenation vs `strings.Builder`
-- Unicode handling
+**Go Concepts Learned**:
+- **`strings.TrimSpace`**: Removes all Unicode whitespace from both ends
+- **`strings.TrimLeft` / `strings.TrimRight`**: Removes characters from a cutset (set of chars, not substring)
+- **`strings.ToUpper` / `strings.ToLower`**: Unicode-aware case conversion
+- **Simple concatenation**: `prefix + line` is idiomatic for small string joins
 
-### Steps
+### Implementation Notes
 
-1. **Implement rules**:
-   - `TrimRule` with left/right/both variants
-   - `PrependRule` and `AppendRule`
-   - `SurroundRule`
-   - `QuoteRule` and `UnquoteRule`
+**Word Commands**: `trim`, `triml`, `trimr`, `upper`, `lower` are bare word commands (like `sort`, `reverse`) — no delimiter or arguments needed. The parser matches the exact word.
 
-### Tests to Write
-- [ ] Trim removes whitespace
-- [ ] Trim left/right variants work
-- [ ] Prepend adds to start
-- [ ] Append adds to end
-- [ ] Surround wraps with both
-- [ ] Quote handles existing quotes
-- [ ] Unquote removes outer quotes only
+**Text Commands**: `prepend`, `append`, `surround` take text arguments via delimiters (like `join`). A shared `parseTextCommand` helper handles delimiter parsing and dispatches by name.
 
-### Deliverable
+**TrimRule modes**: A single `TrimRule` struct with a `mode` field ("both", "left", "right") instead of three separate types. The three constructors `NewTrimRule`, `NewTrimLeftRule`, `NewTrimRightRule` set the mode.
+
+### Tests Written
+- [x] Trim removes whitespace from both ends
+- [x] Trim handles tabs, mixed whitespace, internal spaces
+- [x] TrimLeft removes leading whitespace only
+- [x] TrimRight removes trailing whitespace only
+- [x] Upper converts to uppercase
+- [x] Lower converts to lowercase
+- [x] Prepend adds text before each line
+- [x] Append adds text after each line
+- [x] Surround wraps with before and after text
+- [x] Parser: trim, triml, trimr, upper, lower (word commands)
+- [x] Parser: prepend, append, surround (with delimiters)
+- [x] Parser: missing argument errors
+- [x] CLI: trim, triml, trimr end-to-end
+- [x] CLI: upper, lower end-to-end
+- [x] CLI: prepend, append, surround end-to-end
+- [x] CLI: trim then upper (chained)
+- [x] CLI: if condition with prepend
+
+### Files Created
+- `internal/rule/trim_rule.go` — TrimRule with both/left/right modes
+- `internal/rule/case_rule.go` — UpperRule and LowerRule
+- `internal/rule/text_rule.go` — PrependRule, AppendRule, SurroundRule
+- `internal/rule/text_rule_test.go` — Rule tests
+- `internal/parser/parse_text_test.go` — Parser tests
+
+### Files Modified
+- `internal/parser/parser.go` — Added word command dispatch + `parseTextCommand` helper
+- `cmd/ged/main_test.go` — CLI integration tests
+
+### Deliverable ✅
 ```bash
-echo "  hello  " | ged 'trim'
+echo "  hello  " | ged trim
 # Output: hello
+
+echo "hello" | ged upper
+# Output: HELLO
+
+echo "hello" | ged 'prepend/>> /'
+# Output: >> hello
+
+echo "hello" | ged 'surround/[/]/'
+# Output: [hello]
+
+echo "  hello  " | ged trim upper
+# Output: HELLO
 ```
 
 ---
 
-## Phase 11: Column Operations
+## Phase 11: Column Operations ✅ COMPLETE
 
-**Goal**: Implement `cols//1,3,2` for column selection
+**Goal**: Implement `cols/pattern/spec` for column selection and reordering
 
-**Go Concepts Introduced**:
-- `strings.Fields` and `strings.Split`
-- Index manipulation
-- Negative indexing pattern
+**Go Concepts Learned**:
+- **Regex splitting**: Iterating `FindStringMatch`/`FindNextMatch` to split strings by regex pattern
+- **Index resolution**: Converting 1-based/negative indices to 0-based, `(int, bool)` validity pattern
+- **`strconv.Atoi`**: Parsing column spec strings into integers
 
-### Steps
+### Implementation Notes
 
-1. **Parse column specification**
-   - Positive indices (1-based)
-   - Negative indices (from end)
-   - Ranges like `1-3`
+**Syntax**: `cols/pattern/spec` or `cols/pattern/spec/joiner`
+- Pattern is a regex (empty = `\s+` for whitespace splitting)
+- Spec is comma-separated: `1,3-5,-1` (1-based, negatives from end, ranges inclusive)
+- Joiner defaults to `" "` (single space)
+- Quote delimiters for literal split patterns: `` cols`,`1,2 ``
 
-2. **Implement ColumnsRule**
-   - Split line by delimiter (whitespace default)
-   - Select and reorder columns
-   - Join with output separator
+**ColumnSpec**: Parsed into `[]colEntry` where each entry is a single index or range. `Resolve(numCols)` returns ordered 0-based indices, silently skipping out-of-bounds.
 
-### Tests to Write
-- [ ] Select single column
-- [ ] Select multiple columns
-- [ ] Reorder columns
-- [ ] Negative indices work
-- [ ] Custom delimiter works
-- [ ] Custom output separator works
-- [ ] Out-of-bounds columns handled gracefully
+**regexSplit**: Custom function that splits a string by a `regexp2.Regexp` pattern, collecting text between matches. Preserves empty strings at boundaries (like most languages' regex split).
 
-### Deliverable
+### Tests Written
+- [x] ColumnSpec: single, multiple, reorder, negative, range, open range, reverse range, mixed
+- [x] ColumnSpec: out-of-bounds skipped, duplicates preserved
+- [x] ColumnSpec: error on empty, zero index, invalid text
+- [x] ColumnsRule: select single/multiple columns, reorder
+- [x] ColumnsRule: negative index, range, open range
+- [x] ColumnsRule: comma delimiter, custom joiner, comma-space regex
+- [x] ColumnsRule: multiple spaces collapsed, out-of-bounds, empty joiner
+- [x] regexSplit: whitespace, comma, no match, leading/trailing sep, multi-char
+- [x] Parser: whitespace default, comma pattern, with joiner, regex pattern, literal backtick, negative, range
+- [x] Parser: errors for missing spec, missing delimiter, invalid spec, invalid pattern
+- [x] CLI: whitespace splitting, comma splitting, custom joiner, negative index
+- [x] CLI: cols then substitute (chained), cols inside if condition
+
+### Files Created
+- `internal/rule/columns_rule.go` — ColumnsRule, ColumnSpec, regexSplit
+- `internal/rule/columns_rule_test.go` — Rule and spec tests
+- `internal/parser/parse_cols_test.go` — Parser tests
+
+### Files Modified
+- `internal/parser/parser.go` — Added `cols` dispatch and `parseCols` function
+
+### Deliverable ✅
 ```bash
-echo "a b c d" | ged 'cols//3,1'
-# Output: c a
+echo "alice 25 engineer" | ged 'cols//3,1'
+# Output: engineer alice
+
+echo "a,b,c,d" | ged 'cols/,/1,3/-'
+# Output: a-c
+
+echo "a  b  c  d  e" | ged 'cols//-1,1'
+# Output: e a
+
+echo "alice,25,engineer" | ged 'cols/,/1,3/ | '
+# Output: alice | engineer
 ```
 
 ---
 
-## Phase 12: Extraction Rules
+## Phase 12: Extraction Rules ✅ COMPLETE
 
 **Goal**: Implement `t/pattern/`, `r/pattern/`, group capture (`1/pattern/`)
 
-**Go Concepts Introduced**:
-- Regex submatches
-- `regexp.FindStringSubmatch`
-- Slice indexing safety
+**Go Concepts Learned**:
+- **`FindStringMatch`**: Returns a `*Match` object with full match and capture groups
+- **`Groups()`**: Returns `[]Group` where index 0 is the full match, 1+ are captures
+- **`FindNextMatch`**: Iterates to the next match for global extraction
+- **Group validity check**: `group.Length == 0` means the group didn't participate
 
-### Steps
+### Implementation Notes
 
-1. **Implement TakeRule**
-   - Return only the matching portion
-   - Return whole line if no match
+**Three Extraction Rules**:
+- `TakeRule` (`t/pattern/`) — extracts the matching portion. With capture groups, returns the first group. With `g` flag, collects all matches space-separated.
+- `RemoveRule` (`r/pattern/`) — removes the matching portion using `Replace` with empty string. Supports `g` flag for removing all matches.
+- `GroupRule` (`1/pattern/` through `9/pattern/`) — extracts a specific numbered capture group. Group numbers are 1-based.
 
-2. **Implement RemoveRule**
-   - Remove the matching portion
-   - Return whole line if no match
+**No-match behavior**: All three rules pass the line through unchanged if the pattern doesn't match. This is the safe default — no data loss.
 
-3. **Implement GroupMatchRule**
-   - Extract specific capture group
-   - Handle missing groups
+**Parser dispatch**: Single-digit commands (`1`-`9`) are matched after all letter commands. The `r` command doesn't conflict with `reverse` because word commands are checked first.
 
-### Tests to Write
-- [ ] Take extracts match
-- [ ] Take returns line on no match
-- [ ] Remove deletes match
-- [ ] Group extracts numbered group
-- [ ] Invalid group number handled
-- [ ] TakePrint and RemovePrint variants work
+### Tests Written
+- [x] Take extracts first match
+- [x] Take no match passes through
+- [x] Take extracts first capture group when present
+- [x] Take returns full match without capture groups
+- [x] Take global collects all matches
+- [x] Take global with capture groups
+- [x] Take first match only without global
+- [x] Take case insensitive
+- [x] Remove removes first match
+- [x] Remove no match passes through
+- [x] Remove global removes all matches
+- [x] Remove regex match (e.g., strip comments)
+- [x] Remove case insensitive
+- [x] Remove only first without global
+- [x] Group extracts group 1, group 2
+- [x] Group no match passes through
+- [x] Group out of range passes through
+- [x] Group optional group that didn't participate passes through
+- [x] Group case insensitive
+- [x] Invalid group number (0, negative) errors
+- [x] Parser: t/pattern/, r/pattern/, 1/pattern/ through 9/pattern/
+- [x] Parser: flags (g, i), alternate delimiters, literal backtick
+- [x] Parser: empty pattern errors
+- [x] CLI: take, take global, remove, remove global, group capture
+- [x] CLI: take then substitute (chained), remove with trim
 
-### Deliverable
+### Files Created
+- `internal/rule/take_rule.go` — TakeRule with global support
+- `internal/rule/remove_rule.go` — RemoveRule (uses Replace with empty string)
+- `internal/rule/group_rule.go` — GroupRule for numbered capture groups
+- `internal/rule/take_rule_test.go` — Tests
+- `internal/rule/remove_rule_test.go` — Tests
+- `internal/rule/group_rule_test.go` — Tests
+- `internal/parser/parse_extract_test.go` — Parser tests
+
+### Files Modified
+- `internal/parser/parser.go` — Added `t`, `r`, `1`-`9` dispatch + `parseTake`, `parseRemove`, `parseGroup`
+- `cmd/ged/main_test.go` — CLI integration tests
+
+### Deliverable ✅
 ```bash
 echo "hello world" | ged '1/(\w+) (\w+)/'
 # Output: hello
+
+echo "abc 123 def 456" | ged 't/\d+/g'
+# Output: 123 456
+
+echo "code  # comment" | ged 'r/\s*#.*/'
+# Output: code
+
+echo "name: alice, age: 30" | ged '2/name: (\w+), age: (\d+)/'
+# Output: 30
 ```
 
 ---
@@ -834,39 +947,78 @@ See Phase 7b above for full details.
 
 ---
 
-## Phase 14: External Commands
+## Phase 14: External Commands ✅ COMPLETE
 
-**Goal**: Implement `xargs/command/` and `exec`
+**Goal**: Implement `xargs/command/` and `exec/command/`
 
-**Go Concepts Introduced**:
-- `os/exec` package
-- `exec.Command`
-- Capturing stdout/stderr
-- Process environment
+**Go Concepts Learned**:
+- **`os/exec`**: `exec.Command` creates a command; `cmd.Run()` blocks until done
+- **Shell execution**: `exec.Command("sh", "-c", cmd)` for shell features (pipes, redirects)
+- **`cmd.Stdin`/`cmd.Stdout`**: Wire `io.Reader`/`io.Writer` to control I/O
+- **`*exec.ExitError`**: Non-zero exit codes produce this error type
+- **Shell quoting**: Single-quote wrapping with `'\\''` escaping prevents injection
 
-### Steps
+### Implementation Notes
 
-1. **Implement XargsExecRule**
-   - Execute command with line as argument
-   - Capture output as new line(s)
+**Two Rule Types**:
+- `XargsRule` (LineRule) — For each input line, runs `sh -c "command 'line'"`. The line is shell-quoted to prevent injection. If the command fails, the line passes through unchanged.
+- `ExecRule` (DocumentRule) — Pipes the entire document into the command's stdin, captures stdout as the new document. Errors propagate (unlike xargs).
 
-2. **Implement DocumentExecRule**
-   - Execute entire document as shell script
-   - Return output
+**Shell Quoting**: `shellQuote()` wraps strings in single quotes and escapes embedded single quotes as `'\''`. This prevents `$`, backticks, and other metacharacters from being interpreted.
 
-3. **Handle errors and timeouts**
+**Parser Syntax**: Uses delimiter-based parsing like other commands:
+- `xargs/echo hello/` — runs `echo hello 'line'` for each line
+- `exec/sort -n/` — pipes document through `sort -n`
+- `exec|grep foo | wc -l|` — alternate delimiters for commands containing `/`
 
-### Tests to Write
-- [ ] Xargs executes for each line
-- [ ] Xargs captures output
-- [ ] Exec runs document as script
-- [ ] Command failures handled
-- [ ] Environment paged correctly
+### Tests Written
+- [x] Xargs echo with argument
+- [x] Xargs transforms each line
+- [x] Xargs command producing multiple lines
+- [x] Xargs command producing empty output (deletes line)
+- [x] Xargs failing command passes line through
+- [x] Xargs handles special characters in line (no injection)
+- [x] Shell quoting handles single quotes, `$()`, backticks
+- [x] Exec sort command
+- [x] Exec cat passes through
+- [x] Exec grep filters lines
+- [x] Exec awk transforms with line numbers
+- [x] Exec wc -l counts lines (with pipe)
+- [x] Exec grep no match returns error
+- [x] Exec nonexistent command returns error
+- [x] Exec head limits output
+- [x] Parser: xargs/cmd/, exec/cmd/, alternate delimiters, errors
+- [x] CLI: xargs echo end-to-end
+- [x] CLI: xargs after substitution (chained)
+- [x] CLI: exec sort end-to-end
+- [x] CLI: exec grep with pipe
+- [x] CLI: exec after substitution
+- [x] CLI: xargs inside if condition
 
-### Deliverable
+### Files Created
+- `internal/rule/xargs_rule.go` — XargsRule (LineRule) with shellQuote
+- `internal/rule/exec_rule.go` — ExecRule (DocumentRule)
+- `internal/rule/xargs_rule_test.go` — Rule tests
+- `internal/rule/exec_rule_test.go` — Rule tests
+- `internal/parser/parse_exec_test.go` — Parser tests
+
+### Files Modified
+- `internal/parser/parser.go` — Added `xargs`/`exec` dispatch + `parseXargs`, `parseExec`
+- `cmd/ged/main_test.go` — CLI integration tests
+
+### Deliverable ✅
 ```bash
 echo -e "hello\nworld" | ged 'xargs/echo hi/'
 # Output: hi hello\nhi world
+
+echo -e "c\na\nb" | ged 'exec/sort/'
+# Output: a\nb\nc
+
+echo -e "hello\nworld\nhello" | ged 'if/hello/' '{' 'xargs/echo matched:/' '}'
+# Output: matched: hello\nworld\nmatched: hello
+
+echo -e "3\n1\n2" | ged 's/$/x/' 'exec/sort/'
+# Output: 1x\n2x\n3x
 ```
 
 ---

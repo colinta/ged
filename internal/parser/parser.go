@@ -71,6 +71,12 @@ func ParseRule(input string) (any, error) {
 	if strings.HasPrefix(input, "cols") {
 		return parseCols(input)
 	}
+	if strings.HasPrefix(input, "xargs") {
+		return parseXargs(input)
+	}
+	if strings.HasPrefix(input, "exec") {
+		return parseExec(input)
+	}
 
 	if len(input) < 2 {
 		return nil, fmt.Errorf("invalid rule: too short")
@@ -407,6 +413,46 @@ func parseGroup(parts []string, groupNum int) (rule.LineRule, error) {
 	}
 	opts := flagsFromParts(parts, 1)
 	return rule.NewGroupRule(parts[0], groupNum, opts...)
+}
+
+// parseXargs parses "xargs/command/" and returns a LineRule that runs the command for each line.
+func parseXargs(input string) (rule.LineRule, error) {
+	rest := input[5:] // skip "xargs"
+	if len(rest) == 0 {
+		return nil, fmt.Errorf("xargs requires a command")
+	}
+
+	delimiter := rest[0]
+	parts, err := splitByDelimiter(rest[1:], delimiter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parts) < 1 || parts[0] == "" {
+		return nil, fmt.Errorf("xargs requires a command")
+	}
+
+	return rule.NewXargsRule(parts[0]), nil
+}
+
+// parseExec parses "exec/command/" and returns a DocumentRule that pipes document through the command.
+func parseExec(input string) (rule.DocumentRule, error) {
+	rest := input[4:] // skip "exec"
+	if len(rest) == 0 {
+		return nil, fmt.Errorf("exec requires a command")
+	}
+
+	delimiter := rest[0]
+	parts, err := splitByDelimiter(rest[1:], delimiter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parts) < 1 || parts[0] == "" {
+		return nil, fmt.Errorf("exec requires a command")
+	}
+
+	return rule.NewExecRule(parts[0]), nil
 }
 
 // parseControl parses "name/pattern/" for control rules (on, off, after, toggle).

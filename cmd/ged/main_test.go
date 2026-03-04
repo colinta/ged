@@ -1472,3 +1472,93 @@ func TestRun_TakeGlobalWithJoiner(t *testing.T) {
 		t.Errorf("got %q, want %q", out.String(), want)
 	}
 }
+
+func TestRun_XargsEcho(t *testing.T) {
+	in := strings.NewReader("hello\nworld")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"xargs/echo hi/"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "hi hello\nhi world\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_XargsWithSubstitution(t *testing.T) {
+	in := strings.NewReader("hello\nworld")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"s/o/0/", "xargs/echo/"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "hell0\nw0rld\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_ExecSort(t *testing.T) {
+	in := strings.NewReader("c\na\nb")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"exec/sort/"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "a\nb\nc\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_ExecWithPipe(t *testing.T) {
+	in := strings.NewReader("hello\nworld\nhello again")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"exec/grep hello/"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "hello\nhello again\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_ExecAfterSubstitution(t *testing.T) {
+	in := strings.NewReader("3\n1\n2")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"s/$/x/", "exec/sort/"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "1x\n2x\n3x\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_XargsInsideIf(t *testing.T) {
+	in := strings.NewReader("hello\nworld\nhello")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"if/hello/", "{", "xargs/echo matched:/", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "matched: hello\nworld\nmatched: hello\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
