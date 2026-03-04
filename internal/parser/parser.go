@@ -43,6 +43,35 @@ func ParseRule(input string) (any, error) {
 		return parseControl(input, "toggle")
 	}
 
+	// Text modification word commands
+	if input == "trim" {
+		return rule.NewTrimRule(), nil
+	}
+	if input == "triml" {
+		return rule.NewTrimLeftRule(), nil
+	}
+	if input == "trimr" {
+		return rule.NewTrimRightRule(), nil
+	}
+	if input == "upper" {
+		return rule.NewUpperRule(), nil
+	}
+	if input == "lower" {
+		return rule.NewLowerRule(), nil
+	}
+	if strings.HasPrefix(input, "prepend") {
+		return parseTextCommand(input, "prepend", 1)
+	}
+	if strings.HasPrefix(input, "append") {
+		return parseTextCommand(input, "append", 1)
+	}
+	if strings.HasPrefix(input, "surround") {
+		return parseTextCommand(input, "surround", 2)
+	}
+	if strings.HasPrefix(input, "cols") {
+		return parseCols(input)
+	}
+
 	if len(input) < 2 {
 		return nil, fmt.Errorf("invalid rule: too short")
 	}
@@ -74,6 +103,12 @@ func ParseRule(input string) (any, error) {
 		return parseSubstitutionLineNum(parts)
 	} else if command == 's' {
 		return parseSubstitution(parts)
+	} else if command == 't' {
+		return parseTake(parts)
+	} else if command == 'r' {
+		return parseRemove(parts)
+	} else if command >= '1' && command <= '9' {
+		return parseGroup(parts, int(command-'0'))
 	} else {
 		return nil, fmt.Errorf("unknown command: %c", command)
 	}
@@ -104,6 +139,85 @@ func flagsFromParts(parts []string, flagIndex int) []rule.RuleOption {
 		return parseFlags(parts[flagIndex])
 	}
 	return nil
+}
+
+// parseTextCommand handles word commands that take text arguments via delimiters.
+// name is the command name, requiredParts is how many delimiter-separated parts are needed.
+func parseTextCommand(input string, name string, requiredParts int) (rule.LineRule, error) {
+	rest := input[len(name):]
+	if len(rest) == 0 {
+		return nil, fmt.Errorf("%s requires a delimiter and argument(s)", name)
+	}
+
+	delimiter := rest[0]
+	parts, err := splitByDelimiter(rest[1:], delimiter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parts) < requiredParts || parts[0] == "" {
+		return nil, fmt.Errorf("%s requires %d argument(s)", name, requiredParts)
+	}
+
+	switch name {
+	case "prepend":
+		return rule.NewPrependRule(parts[0]), nil
+	case "append":
+		return rule.NewAppendRule(parts[0]), nil
+	case "surround":
+		if len(parts) < 2 || parts[1] == "" {
+			return nil, fmt.Errorf("surround requires before and after text")
+		}
+		return rule.NewSurroundRule(parts[0], parts[1]), nil
+	default:
+		return nil, fmt.Errorf("unknown text command: %s", name)
+	}
+}
+
+// parseCols handles "cols/pattern/spec" and "cols/pattern/spec/joiner" syntax.
+// An empty pattern defaults to \s+ (whitespace splitting).
+func parseCols(input string) (rule.LineRule, error) {
+	rest := input[4:] // skip "cols"
+	if len(rest) == 0 {
+		return nil, fmt.Errorf("cols requires a delimiter, pattern, and column spec")
+	}
+
+	delimiter := rest[0]
+	parts, err := splitByDelimiter(rest[1:], delimiter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("cols requires a pattern and column spec")
+	}
+
+	// Pattern: empty means \s+
+	patternStr := parts[0]
+	if patternStr == "" {
+		patternStr = `\s+`
+	} else if delimiter == '`' || delimiter == '\'' || delimiter == '"' {
+		patternStr = regexp2.Escape(patternStr)
+	}
+
+	pattern, err := rule.CompilePattern(patternStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pattern in cols: %w", err)
+	}
+
+	// Column spec
+	spec, err := rule.ParseColumnSpec(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("invalid column spec in cols: %w", err)
+	}
+
+	// Joiner: default to " "
+	joiner := " "
+	if len(parts) >= 3 {
+		joiner = parts[2]
+	}
+
+	return rule.NewColumnsRule(pattern, spec, joiner), nil
 }
 
 // parseJoin handles "join" (bare) and "join/sep/" syntax.
@@ -260,6 +374,39 @@ func parseDeleteLineNum(parts []string) (rule.LineRule, error) {
 		return nil, fmt.Errorf("invalid line range: %w", err)
 	}
 	return rule.NewDeleteLineNumRule(lineRange), nil
+}
+
+// parseTake creates a TakeRule for extracting matching text.
+// Syntax: t/pattern/, t/pattern/flags, t/pattern/flags/joiner
+// The joiner is used in global mode to join multiple matches (default: space).
+func parseTake(parts []string) (rule.LineRule, error) {
+	if len(parts) < 1 || parts[0] == "" {
+		return nil, fmt.Errorf("take requires a pattern")
+	}
+	opts := flagsFromParts(parts, 1)
+	joiner := " " // default
+	if len(parts) > 2 {
+		joiner = parts[2]
+	}
+	return rule.NewTakeRule(parts[0], joiner, opts...)
+}
+
+// parseRemove creates a RemoveRule for removing matching text.
+func parseRemove(parts []string) (rule.LineRule, error) {
+	if len(parts) < 1 || parts[0] == "" {
+		return nil, fmt.Errorf("remove requires a pattern")
+	}
+	opts := flagsFromParts(parts, 1)
+	return rule.NewRemoveRule(parts[0], opts...)
+}
+
+// parseGroup creates a GroupRule for extracting a numbered capture group.
+func parseGroup(parts []string, groupNum int) (rule.LineRule, error) {
+	if len(parts) < 1 || parts[0] == "" {
+		return nil, fmt.Errorf("group requires a pattern")
+	}
+	opts := flagsFromParts(parts, 1)
+	return rule.NewGroupRule(parts[0], groupNum, opts...)
 }
 
 // parseControl parses "name/pattern/" for control rules (on, off, after, toggle).

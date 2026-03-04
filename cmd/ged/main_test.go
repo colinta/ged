@@ -973,3 +973,502 @@ func TestRun_InputFileWithSort(t *testing.T) {
 		t.Errorf("got %q, want %q", out.String(), want)
 	}
 }
+
+// --- Phase 10: Text modification rules ---
+
+func TestRun_Trim(t *testing.T) {
+	in := strings.NewReader("  hello  \n\tworld\t\n  foo bar  ")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"trim"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "hello\nworld\nfoo bar\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_TrimLeft(t *testing.T) {
+	in := strings.NewReader("  hello  ")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"triml"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "hello  \n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_TrimRight(t *testing.T) {
+	in := strings.NewReader("  hello  ")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"trimr"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "  hello\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_Upper(t *testing.T) {
+	in := strings.NewReader("hello\nWorld")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"upper"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "HELLO\nWORLD\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_Lower(t *testing.T) {
+	in := strings.NewReader("HELLO\nWorld")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"lower"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "hello\nworld\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_Prepend(t *testing.T) {
+	in := strings.NewReader("hello\nworld")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"prepend/>> /"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := ">> hello\n>> world\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_Append(t *testing.T) {
+	in := strings.NewReader("hello\nworld")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"append/;/"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "hello;\nworld;\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_Surround(t *testing.T) {
+	in := strings.NewReader("hello\nworld")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"surround/(/)/)"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "(hello)\n(world)\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_TrimThenUpper(t *testing.T) {
+	in := strings.NewReader("  hello  \n  world  ")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"trim", "upper"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "HELLO\nWORLD\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_IfWithPrepend(t *testing.T) {
+	in := strings.NewReader("error: bad\ninfo: ok\nerror: worse")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"if/error/", "{", "prepend/!! /", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "!! error: bad\ninfo: ok\n!! error: worse\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+// --- Phase 10: Between + text modification ---
+
+func TestRun_BetweenWithTrim(t *testing.T) {
+	in := strings.NewReader("  before  \nSTART\n  hello  \n  world  \nEND\n  after  ")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"between/START/END/", "{", "trim", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "  before  \nSTART\nhello\nworld\nEND\n  after  \n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_BetweenWithUpper(t *testing.T) {
+	in := strings.NewReader("before\nSTART\nhello\nworld\nEND\nafter")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"between/START/END/", "{", "upper", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "before\nSTART\nHELLO\nWORLD\nEND\nafter\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_BetweenWithLower(t *testing.T) {
+	in := strings.NewReader("BEFORE\nSTART\nHELLO\nWORLD\nEND\nAFTER")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"between/START/END/", "{", "lower", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "BEFORE\nstart\nhello\nworld\nend\nAFTER\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_BetweenWithPrepend(t *testing.T) {
+	in := strings.NewReader("before\nSTART\nhello\nworld\nEND\nafter")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"between/START/END/", "{", "prepend/  /", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "before\n  START\n  hello\n  world\n  END\nafter\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_BetweenWithAppend(t *testing.T) {
+	in := strings.NewReader("before\nSTART\nhello\nworld\nEND\nafter")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"between/START/END/", "{", "append/!/", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "before\nSTART!\nhello!\nworld!\nEND!\nafter\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_BetweenWithSurround(t *testing.T) {
+	in := strings.NewReader("before\nSTART\nhello\nworld\nEND\nafter")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"between/START/END/", "{", "surround/[/]/", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "before\n[START]\n[hello]\n[world]\n[END]\nafter\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_BetweenInvertedWithUpper(t *testing.T) {
+	in := strings.NewReader("hello\nSTART\ninside\nEND\nworld")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"!between/START/END/", "{", "upper", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "HELLO\nSTART\ninside\nEND\nWORLD\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_BetweenWithChainedTextRules(t *testing.T) {
+	in := strings.NewReader("before\nSTART\n  hello  \n  world  \nEND\nafter")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"between/START/END/", "{", "trim", "upper", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "before\nSTART\nHELLO\nWORLD\nEND\nafter\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_BetweenMultipleRangesWithPrepend(t *testing.T) {
+	in := strings.NewReader("x\nA\ny\nB\nx\nA\nz\nB\nx")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"between/A/B/", "{", "prepend/>> /", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "x\n>> A\n>> y\n>> B\nx\n>> A\n>> z\n>> B\nx\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_ColsWhitespace(t *testing.T) {
+	in := strings.NewReader("alice 25 engineer\nbob 30 designer")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"cols//1,3"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "alice engineer\nbob designer\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_ColsComma(t *testing.T) {
+	in := strings.NewReader("alice,25,engineer")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"cols/,/3,1"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "engineer alice\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_ColsWithJoiner(t *testing.T) {
+	in := strings.NewReader("a,b,c")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"cols/,/1,3/ | "}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "a | c\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_ColsNegativeIndex(t *testing.T) {
+	in := strings.NewReader("a b c d e")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"cols//1,-1"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "a e\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_ColsThenSubstitute(t *testing.T) {
+	in := strings.NewReader("alice 25 engineer\nbob 30 designer")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"cols//1,3", "s/e/E/g"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "alicE EnginEEr\nbob dEsignEr\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_ColsWithIfCondition(t *testing.T) {
+	in := strings.NewReader("alice,25,engineer\nbob,30,designer\ncharlie,35,engineer")
+	out := &bytes.Buffer{}
+
+	err := run([]string{"if/engineer/", "{", "cols/,/1,3", "}"}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "alice engineer\nbob,30,designer\ncharlie engineer\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_Take(t *testing.T) {
+	in := strings.NewReader("abc 123 def\nno numbers\n456 xyz")
+	out := &bytes.Buffer{}
+
+	err := run([]string{`t/\d+/`}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "123\nno numbers\n456\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_TakeGlobal(t *testing.T) {
+	in := strings.NewReader("a1 b2 c3")
+	out := &bytes.Buffer{}
+
+	err := run([]string{`t/\d+/g`}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "1 2 3\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_Remove(t *testing.T) {
+	in := strings.NewReader("hello 123 world\nabc def")
+	out := &bytes.Buffer{}
+
+	err := run([]string{`r/\d+/`}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "hello  world\nabc def\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_RemoveGlobal(t *testing.T) {
+	in := strings.NewReader("a1b2c3")
+	out := &bytes.Buffer{}
+
+	err := run([]string{`r/\d/g`}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "abc\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_GroupCapture(t *testing.T) {
+	in := strings.NewReader("name: alice, age: 30\nname: bob, age: 25")
+	out := &bytes.Buffer{}
+
+	err := run([]string{`2/name: (\w+), age: (\d+)/`}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "30\n25\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_TakeThenSubstitute(t *testing.T) {
+	in := strings.NewReader("email: user@host.com ok")
+	out := &bytes.Buffer{}
+
+	err := run([]string{`t/\S+@\S+/`, `s/@/ at /`}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "user at host.com\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_RemoveWithTrim(t *testing.T) {
+	in := strings.NewReader("hello  # comment")
+	out := &bytes.Buffer{}
+
+	err := run([]string{`r/\s*#.*/`, `trimr`}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "hello\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
+func TestRun_TakeGlobalWithJoiner(t *testing.T) {
+	in := strings.NewReader("abc 123 def 456")
+	out := &bytes.Buffer{}
+
+	err := run([]string{`t/\d+/g/,`}, in, out, io.Discard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "123,456\n"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
