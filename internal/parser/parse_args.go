@@ -49,15 +49,25 @@ func parseArgs(args []string) ([]any, []string, error) {
 			}
 			args = remaining
 
-			if hasDocRule(innerParsed) {
-				docRules := buildDocRules(innerParsed)
-				results = append(results, rule.NewConditionalDocRule(cond.pattern, cond.inverted, docRules))
-			} else {
-				var lineRules []rule.LineRule
-				for _, p := range innerParsed {
-					lineRules = append(lineRules, p.(rule.LineRule))
+			// Check for else clause
+			var elseParsed []any
+			if len(args) > 0 && args[0] == "else" {
+				args = args[1:] // consume "else"
+				elseParsed, remaining, err = collectBlock(args, "else clause")
+				if err != nil {
+					return nil, nil, err
 				}
-				results = append(results, rule.NewConditionalLineRule(cond.pattern, cond.inverted, lineRules))
+				args = remaining
+			}
+
+			if hasDocRule(innerParsed) || hasDocRule(elseParsed) {
+				docRules := buildDocRules(innerParsed)
+				elseDocRules := buildDocRules(elseParsed)
+				results = append(results, rule.NewConditionalDocRule(cond.pattern, cond.inverted, docRules, elseDocRules))
+			} else {
+				lineRules := toLineRules(innerParsed)
+				elseLineRules := toLineRules(elseParsed)
+				results = append(results, rule.NewConditionalLineRule(cond.pattern, cond.inverted, lineRules, elseLineRules))
 			}
 		} else if cond, ok := parsed.(*betweenCondition); ok {
 			innerParsed, remaining, err := collectBlock(args, "between condition")
@@ -66,16 +76,70 @@ func parseArgs(args []string) ([]any, []string, error) {
 			}
 			args = remaining
 
-			if hasDocRule(innerParsed) {
-				docRules := buildDocRules(innerParsed)
-				results = append(results, rule.NewBetweenDocRule(cond.startPattern, cond.endPattern, cond.inverted, docRules))
-			} else {
-				var lineRules []rule.LineRule
-				for _, p := range innerParsed {
-					lineRules = append(lineRules, p.(rule.LineRule))
+			// Check for else clause
+			var elseParsed []any
+			if len(args) > 0 && args[0] == "else" {
+				args = args[1:] // consume "else"
+				elseParsed, remaining, err = collectBlock(args, "else clause")
+				if err != nil {
+					return nil, nil, err
 				}
-				results = append(results, rule.NewBetweenLineRule(cond.startPattern, cond.endPattern, cond.inverted, lineRules))
+				args = remaining
 			}
+
+			if hasDocRule(innerParsed) || hasDocRule(elseParsed) {
+				docRules := buildDocRules(innerParsed)
+				elseDocRules := buildDocRules(elseParsed)
+				results = append(results, rule.NewBetweenDocRule(cond.startPattern, cond.endPattern, cond.inverted, docRules, elseDocRules))
+			} else {
+				lineRules := toLineRules(innerParsed)
+				elseLineRules := toLineRules(elseParsed)
+				results = append(results, rule.NewBetweenLineRule(cond.startPattern, cond.endPattern, cond.inverted, lineRules, elseLineRules))
+			}
+		} else if cond, ok := parsed.(*ifAnyCondition); ok {
+			innerParsed, remaining, err := collectBlock(args, "ifany condition")
+			if err != nil {
+				return nil, nil, err
+			}
+			args = remaining
+
+			// Check for else clause
+			var elseParsed []any
+			if len(args) > 0 && args[0] == "else" {
+				args = args[1:] // consume "else"
+				elseParsed, remaining, err = collectBlock(args, "else clause")
+				if err != nil {
+					return nil, nil, err
+				}
+				args = remaining
+			}
+
+			// ifany is always a DocumentRule (needs full scan)
+			docRules := buildDocRules(innerParsed)
+			elseDocRules := buildDocRules(elseParsed)
+			results = append(results, rule.NewIfAnyDocRule(cond.pattern, cond.inverted, docRules, elseDocRules))
+		} else if cond, ok := parsed.(*ifNoneCondition); ok {
+			innerParsed, remaining, err := collectBlock(args, "ifnone condition")
+			if err != nil {
+				return nil, nil, err
+			}
+			args = remaining
+
+			// Check for else clause
+			var elseParsed []any
+			if len(args) > 0 && args[0] == "else" {
+				args = args[1:] // consume "else"
+				elseParsed, remaining, err = collectBlock(args, "else clause")
+				if err != nil {
+					return nil, nil, err
+				}
+				args = remaining
+			}
+
+			// ifnone is always a DocumentRule (needs full scan)
+			docRules := buildDocRules(innerParsed)
+			elseDocRules := buildDocRules(elseParsed)
+			results = append(results, rule.NewIfNoneDocRule(cond.pattern, cond.inverted, docRules, elseDocRules))
 		} else {
 			results = append(results, parsed)
 		}
@@ -100,6 +164,18 @@ func collectBlock(args []string, context string) ([]any, []string, error) {
 		return nil, nil, fmt.Errorf("expected '}'")
 	}
 	return innerParsed, remaining[1:], nil
+}
+
+// toLineRules converts a []any (all expected to be LineRule) into []rule.LineRule.
+func toLineRules(parsed []any) []rule.LineRule {
+	if len(parsed) == 0 {
+		return nil
+	}
+	var lineRules []rule.LineRule
+	for _, p := range parsed {
+		lineRules = append(lineRules, p.(rule.LineRule))
+	}
+	return lineRules
 }
 
 // hasDocRule reports whether any element in parsed is a DocumentRule.

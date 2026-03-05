@@ -1,0 +1,144 @@
+- name: sort
+  args: [sort]
+  input: |
+    c
+    a
+    b
+  output: |
+    a
+    b
+    c
+
+- name: reverse
+  args: [reverse]
+  input: |
+    a
+    b
+    c
+  output: |
+    c
+    b
+    a
+
+- name: join with comma
+  args: ["join/,/"]
+  input: |
+    a
+    b
+    c
+  output: "a,b,c\n"
+
+- name: join bare (empty separator)
+  args: [join]
+  input: |
+    a
+    b
+    c
+  output: "abc\n"
+
+- name: line rules then sort
+  args: [s/x/y, sort]
+  input: |
+    cx
+    ax
+    bx
+  output: |
+    ay
+    by
+    cy
+
+- name: sort then line rules
+  args: [sort, s/x/y]
+  input: |
+    cx
+    ax
+    bx
+  output: |
+    ay
+    by
+    cy
+
+- name: lines
+  args: [lines]
+  input: |
+    a
+    b
+    c
+  output: |
+    1: a
+    2: b
+    3: c
+
+- name: count
+  args: [count]
+  input: |
+    a
+    b
+    c
+  output: |
+    3
+
+- name: uniq
+  args: [uniq]
+  input: |
+    a
+    a
+    b
+    b
+    a
+  output: |
+    a
+    b
+    a
+
+- name: begin
+  args: ["begin/header/"]
+  input: |
+    a
+    b
+  output: |
+    header
+    a
+    b
+
+- name: end
+  args: ["end/footer/"]
+  input: |
+    a
+    b
+  output: |
+    a
+    b
+    footer
+
+- name: border
+  args: ["border/---/"]
+  input: |
+    a
+    b
+  output: |
+    ---
+    a
+    b
+    ---
+
+- name: sort then uniq
+  args: [sort, uniq]
+  input: |
+    b
+    a
+    b
+    a
+  output: |
+    a
+    b
+
+- name: filter then count
+  args: [p/foo/, count]
+  input: |
+    foo
+    bar
+    foo
+    baz
+  output: |
+    2

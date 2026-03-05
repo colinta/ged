@@ -1,0 +1,58 @@
+- name: print keeps matching lines
+  args: [p/foo]
+  input: |
+    foo
+    bar
+    foo baz
+  output: |
+    foo
+    foo baz
+
+- name: print with regex
+  args: ['p/^\d+$']
+  input: |
+    123
+    abc
+    456
+  output: |
+    123
+    456
+
+- name: delete removes matching lines
+  args: [d/foo]
+  input: |
+    foo
+    bar
+    foo baz
+  output: |
+    bar
+
+- name: delete comments
+  args: ['d/^\s*#']
+  input: |
+    code
+    # comment
+    more code
+      # indented comment
+  output: |
+    code
+    more code
+
+- name: print ignore case
+  args: [p/hello/i]
+  input: |
+    Hello
+    world
+    HELLO
+  output: |
+    Hello
+    HELLO
+
+- name: delete ignore case
+  args: [d/hello/i]
+  input: |
+    Hello
+    world
+    HELLO
+  output: |
+    world

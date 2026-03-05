@@ -1,0 +1,40 @@
+- name: basic substitution
+  args: [s/world/earth]
+  input: "hello world"
+  output: "hello earth\n"
+
+- name: global substitution
+  args: [s/world/earth/g]
+  input: "hello world world"
+  output: "hello earth earth\n"
+
+- name: multiple lines
+  args: [s/line/row]
+  input: |
+    line1
+    line2
+    line3
+  output: |
+    row1
+    row2
+    row3
+
+- name: regex pattern
+  args: ['s/\d+/NUM/g']
+  input: "foo 123 bar 456"
+  output: "foo NUM bar NUM\n"
+
+- name: empty input
+  args: [s/foo/bar]
+  input: ""
+  output: ""
+
+- name: ignore case
+  args: [s/hello/world/i]
+  input: "Hello HELLO hello"
+  output: "world HELLO hello\n"
+
+- name: ignore case global
+  args: [s/hello/world/gi]
+  input: "Hello HELLO hello"
+  output: "world world world\n"

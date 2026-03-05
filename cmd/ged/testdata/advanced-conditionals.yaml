@@ -1,0 +1,223 @@
+# Phase 17: Advanced Conditionals - ifany, ifnone, else
+
+# --- ifany ---
+
+- name: ifany applies to all when one matches
+  args: ["ifany/error/", "{", "upper", "}"]
+  input: |
+    ok
+    error here
+    fine
+  output: |
+    OK
+    ERROR HERE
+    FINE
+
+- name: ifany passes through when no match
+  args: ["ifany/error/", "{", "upper", "}"]
+  input: |
+    ok
+    fine
+    good
+  output: |
+    ok
+    fine
+    good
+
+- name: ifany inverted applies when no match
+  args: ["!ifany/error/", "{", "upper", "}"]
+  input: |
+    ok
+    fine
+  output: |
+    OK
+    FINE
+
+- name: ifany inverted passes through when match exists
+  args: ["!ifany/error/", "{", "upper", "}"]
+  input: |
+    ok
+    error
+    fine
+  output: |
+    ok
+    error
+    fine
+
+- name: ifany with document rule (sort)
+  args: ["ifany/error/", "{", "sort", "}"]
+  input: |
+    c
+    error
+    a
+  output: |
+    a
+    c
+    error
+
+- name: ifany with substitution
+  args: ["ifany/error/", "{", "s/error/ERROR/", "}"]
+  input: |
+    line one
+    error here
+    line three
+  output: |
+    line one
+    ERROR here
+    line three
+
+# --- ifnone ---
+
+- name: ifnone applies when no match
+  args: ["ifnone/error/", "{", "upper", "}"]
+  input: |
+    ok
+    fine
+    good
+  output: |
+    OK
+    FINE
+    GOOD
+
+- name: ifnone passes through when match exists
+  args: ["ifnone/error/", "{", "upper", "}"]
+  input: |
+    ok
+    error here
+    fine
+  output: |
+    ok
+    error here
+    fine
+
+- name: ifnone inverted applies when match exists
+  args: ["!ifnone/error/", "{", "upper", "}"]
+  input: |
+    ok
+    error
+    fine
+  output: |
+    OK
+    ERROR
+    FINE
+
+- name: ifnone with document rule (sort)
+  args: ["ifnone/error/", "{", "sort", "}"]
+  input: |
+    c
+    a
+    b
+  output: |
+    a
+    b
+    c
+
+# --- else with if ---
+
+- name: if else with line rules
+  args: ["if/hello/", "{", "upper", "}", "else", "{", "lower", "}"]
+  input: |
+    hello World
+    GOODBYE World
+  output: |
+    HELLO WORLD
+    goodbye world
+
+- name: if else with substitution
+  args: ["if/foo/", "{", "s/foo/FOO/", "}", "else", "{", "s/bar/BAR/", "}"]
+  input: |
+    foo
+    bar
+    baz
+  output: |
+    FOO
+    BAR
+    baz
+
+- name: inverted if else
+  args: ["!if/hello/", "{", "upper", "}", "else", "{", "lower", "}"]
+  input: |
+    hello World
+    GOODBYE World
+  output: |
+    hello world
+    GOODBYE WORLD
+
+# --- else with ifany ---
+
+- name: ifany else applies else when no match
+  args: ["ifany/error/", "{", "upper", "}", "else", "{", "lower", "}"]
+  input: |
+    OK
+    FINE
+  output: |
+    ok
+    fine
+
+- name: ifany else applies main when match
+  args: ["ifany/error/", "{", "upper", "}", "else", "{", "lower", "}"]
+  input: |
+    ok
+    error
+  output: |
+    OK
+    ERROR
+
+# --- else with ifnone ---
+
+- name: ifnone else applies else when match exists
+  args: ["ifnone/error/", "{", "upper", "}", "else", "{", "lower", "}"]
+  input: |
+    OK
+    error
+  output: |
+    ok
+    error
+
+- name: ifnone else applies main when no match
+  args: ["ifnone/error/", "{", "upper", "}", "else", "{", "lower", "}"]
+  input: |
+    ok
+    fine
+  output: |
+    OK
+    FINE
+
+# --- else with between ---
+
+- name: between else
+  args: ["between/START/END/", "{", "upper", "}", "else", "{", "lower", "}"]
+  input: |
+    BEFORE
+    START
+    middle
+    END
+    AFTER
+  output: |
+    before
+    START
+    MIDDLE
+    END
+    after
+
+# --- chaining ---
+
+- name: ifany then substitute
+  args: ["ifany/error/", "{", "s/error/ERROR/", "}", "s/$/!/"]
+  input: |
+    ok
+    error here
+    fine
+  output: |
+    ok!
+    ERROR here!
+    fine!
+
+- name: substitute then ifnone
+  args: ["s/x/y/", "ifnone/error/", "{", "upper", "}"]
+  input: |
+    ax
+    bx
+  output: |
+    AY
+    BY

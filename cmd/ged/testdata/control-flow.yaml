@@ -1,0 +1,81 @@
+- name: "on: start printing at match"
+  args: ["on/start/"]
+  input: |
+    a
+    start
+    b
+    c
+  output: |
+    start
+    b
+    c
+
+- name: "off: stop printing at match"
+  args: ["off/stop/"]
+  input: |
+    a
+    b
+    stop
+    c
+  output: |
+    a
+    b
+
+- name: "after: start printing after match"
+  args: ["after/marker/"]
+  input: |
+    a
+    marker
+    b
+    c
+  output: |
+    b
+    c
+
+- name: "toggle: flip on each match"
+  args: ["toggle/---/"]
+  input: |
+    off
+    ---
+    on1
+    on2
+    ---
+    off2
+  output: |
+    ---
+    on1
+    on2
+
+- name: on with substitution
+  args: ["on/start/", "s/b/B/"]
+  input: |
+    before
+    start
+    boo
+    car
+  output: |
+    start
+    Boo
+    car
+
+- name: on + off combined
+  args: ["on/start/", "off/end/"]
+  input: |
+    before
+    start
+    middle
+    end
+    after
+  output: |
+    start
+    middle
+
+- name: on ignore case
+  args: ["on/start/i"]
+  input: |
+    before
+    START
+    after
+  output: |
+    START
+    after

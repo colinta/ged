@@ -1,0 +1,34 @@
+- name: no args
+  args: []
+  input: "hello"
+  error: true
+
+- name: invalid rule
+  args: [x/invalid]
+  input: "hello"
+  error: true
+
+- name: invalid regex
+  args: ["s/[invalid/replacement"]
+  input: "hello"
+  error: true
+
+- name: --write requires --input
+  args: [--write, s/a/b/]
+  input: "hello"
+  error: true
+
+- name: --write and --write-to mutually exclusive
+  args: [--write, --write-to=out.txt, --input=foo.txt, s/a/b/]
+  input: ""
+  error: true
+
+- name: --diff and --write mutually exclusive
+  args: [--diff, --write, --input=foo.txt, s/a/b/]
+  input: ""
+  error: true
+
+- name: --diff and --write-to mutually exclusive
+  args: [--diff, --write-to=out.txt, s/a/b/]
+  input: ""
+  error: true

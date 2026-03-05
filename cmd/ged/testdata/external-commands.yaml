@@ -1,0 +1,60 @@
+- name: xargs echo
+  args: ["xargs/echo hi/"]
+  input: |
+    hello
+    world
+  output: |
+    hi hello
+    hi world
+
+- name: xargs with substitution
+  args: [s/o/0/, "xargs/echo/"]
+  input: |
+    hello
+    world
+  output: |
+    hell0
+    w0rld
+
+- name: exec sort
+  args: ["exec/sort/"]
+  input: |
+    c
+    a
+    b
+  output: |
+    a
+    b
+    c
+
+- name: exec grep
+  args: ["exec/grep hello/"]
+  input: |
+    hello
+    world
+    hello again
+  output: |
+    hello
+    hello again
+
+- name: exec after substitution
+  args: ["s/$/x/", "exec/sort/"]
+  input: |
+    3
+    1
+    2
+  output: |
+    1x
+    2x
+    3x
+
+- name: xargs inside if
+  args: ["if/hello/", "{", "xargs/echo matched:/", "}"]
+  input: |
+    hello
+    world
+    hello
+  output: |
+    matched: hello
+    world
+    matched: hello

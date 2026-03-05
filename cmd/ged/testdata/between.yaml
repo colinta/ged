@@ -1,0 +1,243 @@
+- name: between applies rules inside range
+  args: ["between/START/END/", "{", "s/x/y/", "}"]
+  input: |
+    before
+    START
+    x1
+    x2
+    END
+    after
+  output: |
+    before
+    START
+    y1
+    y2
+    END
+    after
+
+- name: between inverted
+  args: ["!between/START/END/", "{", "s/x/y/", "}"]
+  input: |
+    x_before
+    START
+    x_inside
+    END
+    x_after
+  output: |
+    y_before
+    START
+    x_inside
+    END
+    y_after
+
+- name: between multiple ranges
+  args: ["between/START/END/", "{", upper, "}"]
+  input: |
+    before
+    START
+    inside1
+    END
+    between
+    START
+    inside2
+    END
+    after
+  output: |
+    before
+    START
+    INSIDE1
+    END
+    between
+    START
+    INSIDE2
+    END
+    after
+
+- name: between with document rule (sort includes boundaries)
+  args: ["between/START/END/", "{", sort, "}"]
+  input: |
+    before
+    START
+    c
+    a
+    b
+    END
+    after
+  output: |
+    before
+    END
+    START
+    a
+    b
+    c
+    after
+
+- name: between ignore case
+  args: ["between/start/end/i", "{", upper, "}"]
+  input: |
+    before
+    START
+    inside
+    END
+    after
+  output: |
+    before
+    START
+    INSIDE
+    END
+    after
+
+- name: between with trim
+  args: ["between/START/END/", "{", trim, "}"]
+  input: |
+    before
+    START
+      indented
+        more
+    END
+    after
+  output: |
+    before
+    START
+    indented
+    more
+    END
+    after
+
+- name: between with upper
+  args: ["between/START/END/", "{", upper, "}"]
+  input: |
+    before
+    START
+    hello
+    world
+    END
+    after
+  output: |
+    before
+    START
+    HELLO
+    WORLD
+    END
+    after
+
+- name: between with lower (boundaries included)
+  args: ["between/START/END/", "{", lower, "}"]
+  input: |
+    before
+    START
+    HELLO
+    WORLD
+    END
+    after
+  output: |
+    before
+    start
+    hello
+    world
+    end
+    after
+
+- name: between with prepend
+  args: ["between/START/END/", "{", "prepend/>> /", "}"]
+  input: |
+    before
+    START
+    hello
+    world
+    END
+    after
+  output: |
+    before
+    >> START
+    >> hello
+    >> world
+    >> END
+    after
+
+- name: between with append
+  args: ["between/START/END/", "{", "append/ <</", "}"]
+  input: |
+    before
+    START
+    hello
+    world
+    END
+    after
+  output: |
+    before
+    START <<
+    hello <<
+    world <<
+    END <<
+    after
+
+- name: between with surround
+  args: ["between/START/END/", "{", "surround/[/]/", "}"]
+  input: |
+    before
+    START
+    hello
+    END
+    after
+  output: |
+    before
+    [START]
+    [hello]
+    [END]
+    after
+
+- name: between inverted with upper
+  args: ["!between/START/END/", "{", upper, "}"]
+  input: |
+    before
+    START
+    inside
+    END
+    after
+  output: |
+    BEFORE
+    START
+    inside
+    END
+    AFTER
+
+- name: between with chained text rules
+  args: ["between/START/END/", "{", trim, upper, "}"]
+  input: |
+    before
+    START
+      hello
+      world
+    END
+    after
+  output: |
+    before
+    START
+    HELLO
+    WORLD
+    END
+    after
+
+- name: between multiple ranges with prepend
+  args: ["between/START/END/", "{", "prepend/> /", "}"]
+  input: |
+    a
+    START
+    b
+    END
+    c
+    START
+    d
+    END
+    e
+  output: |
+    a
+    > START
+    > b
+    > END
+    c
+    > START
+    > d
+    > END
+    e

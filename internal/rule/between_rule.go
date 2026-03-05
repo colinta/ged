@@ -17,15 +17,17 @@ type BetweenLineRule struct {
 	endPattern   *regexp2.Regexp
 	inverted     bool
 	rules        []LineRule
+	elseRules    []LineRule
 }
 
 // NewBetweenLineRule creates a BetweenLineRule.
-func NewBetweenLineRule(startPattern, endPattern *regexp2.Regexp, inverted bool, rules []LineRule) *BetweenLineRule {
+func NewBetweenLineRule(startPattern, endPattern *regexp2.Regexp, inverted bool, rules []LineRule, elseRules []LineRule) *BetweenLineRule {
 	return &BetweenLineRule{
 		startPattern: startPattern,
 		endPattern:   endPattern,
 		inverted:     inverted,
 		rules:        rules,
+		elseRules:    elseRules,
 	}
 }
 
@@ -64,26 +66,11 @@ func (r *BetweenLineRule) Apply(line string, ctx *LineContext) ([]string, error)
 	var result []string
 	var err error
 	if active {
-		// Apply inner rules as a pipeline
-		current := []string{line}
-		for _, innerRule := range r.rules {
-			var next []string
-			for _, l := range current {
-				out, err := innerRule.Apply(l, ctx)
-				if err != nil {
-					return nil, err
-				}
-				next = append(next, out...)
-			}
-			if len(next) == 0 {
-				return nil, nil
-			}
-			current = next
-		}
-		result = current
+		result, err = applyLineRules(line, ctx, r.rules)
+	} else if len(r.elseRules) > 0 {
+		result, err = applyLineRules(line, ctx, r.elseRules)
 	} else {
 		result = []string{line}
-		err = nil
 	}
 
 	if closingThisLine {
@@ -102,26 +89,34 @@ type BetweenDocRule struct {
 	endPattern   *regexp2.Regexp
 	inverted     bool
 	rules        []DocumentRule
+	elseRules    []DocumentRule
 }
 
 // NewBetweenDocRule creates a BetweenDocRule.
-func NewBetweenDocRule(startPattern, endPattern *regexp2.Regexp, inverted bool, rules []DocumentRule) *BetweenDocRule {
+func NewBetweenDocRule(startPattern, endPattern *regexp2.Regexp, inverted bool, rules []DocumentRule, elseRules []DocumentRule) *BetweenDocRule {
 	return &BetweenDocRule{
 		startPattern: startPattern,
 		endPattern:   endPattern,
 		inverted:     inverted,
 		rules:        rules,
+		elseRules:    elseRules,
 	}
 }
 
-// ApplyDocument collects lines inside between ranges, applies inner rules,
-// then reconstructs the output.
+// ApplyDocument processes each contiguous between range as its own sub-document.
+// Inner rules are applied independently to each range, and the results replace
+// the range in-place. Non-active lines pass through unchanged.
+// When inverted, the "outside" segments are each treated as their own sub-document.
 func (r *BetweenDocRule) ApplyDocument(lines []string) ([]string, error) {
-	var activeLines []string
-	isActive := make([]bool, len(lines))
+	// First pass: identify contiguous segments of active/inactive lines.
+	type segment struct {
+		lines  []string
+		active bool
+	}
+	var segments []segment
 	inside := false
 
-	for i, line := range lines {
+	for _, line := range lines {
 		if !inside {
 			matched, err := r.startPattern.MatchString(line)
 			if err != nil {
@@ -137,10 +132,11 @@ func (r *BetweenDocRule) ApplyDocument(lines []string) ([]string, error) {
 			active = !active
 		}
 
-		if active {
-			activeLines = append(activeLines, line)
-			isActive[i] = true
+		// Append to current segment or start a new one
+		if len(segments) == 0 || segments[len(segments)-1].active != active {
+			segments = append(segments, segment{active: active})
 		}
+		segments[len(segments)-1].lines = append(segments[len(segments)-1].lines, line)
 
 		if inside {
 			matched, err := r.endPattern.MatchString(line)
@@ -153,32 +149,24 @@ func (r *BetweenDocRule) ApplyDocument(lines []string) ([]string, error) {
 		}
 	}
 
-	// Apply inner document rules to the active lines
-	processed := activeLines
-	for _, dr := range r.rules {
-		var err error
-		processed, err = dr.ApplyDocument(processed)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Reconstruct: inactive lines stay in place, processed lines fill active slots
+	// Second pass: apply inner rules to active segments, elseRules to inactive
 	var result []string
-	processedIdx := 0
-	for i, line := range lines {
-		if isActive[i] {
-			if processedIdx < len(processed) {
-				result = append(result, processed[processedIdx])
-				processedIdx++
+	for _, seg := range segments {
+		if seg.active {
+			processed, err := applyDocRules(seg.lines, r.rules)
+			if err != nil {
+				return nil, err
 			}
+			result = append(result, processed...)
+		} else if len(r.elseRules) > 0 {
+			processed, err := applyDocRules(seg.lines, r.elseRules)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, processed...)
 		} else {
-			result = append(result, line)
+			result = append(result, seg.lines...)
 		}
-	}
-	for processedIdx < len(processed) {
-		result = append(result, processed[processedIdx])
-		processedIdx++
 	}
 
 	return result, nil

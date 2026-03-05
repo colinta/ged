@@ -1,0 +1,39 @@
+- name: take first match
+  args: ['t/\d+/']
+  input: "abc 123 def 456"
+  output: "123\n"
+
+- name: take global
+  args: ['t/\d+/g']
+  input: "abc 123 def 456"
+  output: "123 456\n"
+
+- name: take global with joiner
+  args: ['t/\d+/g/,']
+  input: "abc 123 def 456"
+  output: "123,456\n"
+
+- name: remove first match
+  args: ['r/\d+/']
+  input: "abc 123 def 456"
+  output: "abc  def 456\n"
+
+- name: remove global
+  args: ['r/\d+/g']
+  input: "abc 123 def 456"
+  output: "abc  def \n"
+
+- name: group capture
+  args: ['1/(\w+)@(\w+)/']
+  input: "user@host"
+  output: "user\n"
+
+- name: take then substitute
+  args: ['t/\d+/', s/1/X/]
+  input: "abc 123 def"
+  output: "X23\n"
+
+- name: remove with trim
+  args: ['r/\s*#.*/', trim]
+  input: "code  # comment"
+  output: "code\n"

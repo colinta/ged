@@ -21,11 +21,35 @@ func ParseRule(input string) (any, error) {
 	if input == "reverse" {
 		return rule.NewReverseRule(), nil
 	}
+	if input == "lines" {
+		return rule.NewLinesRule(), nil
+	}
+	if input == "count" {
+		return rule.NewCountRule(), nil
+	}
+	if input == "uniq" {
+		return rule.NewUniqRule(), nil
+	}
+	if strings.HasPrefix(input, "begin") {
+		return parseDocTextCommand(input, "begin")
+	}
+	if strings.HasPrefix(input, "end") {
+		return parseDocTextCommand(input, "end")
+	}
+	if strings.HasPrefix(input, "border") {
+		return parseDocTextCommand(input, "border")
+	}
 	if strings.HasPrefix(input, "join") {
 		return parseJoin(input)
 	}
 	if strings.HasPrefix(input, "!between") || strings.HasPrefix(input, "between") {
 		return parseBetween(input)
+	}
+	if strings.HasPrefix(input, "!ifany") || strings.HasPrefix(input, "ifany") {
+		return parseIfAny(input)
+	}
+	if strings.HasPrefix(input, "!ifnone") || strings.HasPrefix(input, "ifnone") {
+		return parseIfNone(input)
 	}
 	if strings.HasPrefix(input, "!if") || strings.HasPrefix(input, "if") {
 		return parseIf(input)
@@ -415,6 +439,35 @@ func parseGroup(parts []string, groupNum int) (rule.LineRule, error) {
 	return rule.NewGroupRule(parts[0], groupNum, opts...)
 }
 
+// parseDocTextCommand handles document-level commands that take text arguments: begin, end, border.
+func parseDocTextCommand(input string, name string) (rule.DocumentRule, error) {
+	rest := input[len(name):]
+	if len(rest) == 0 {
+		return nil, fmt.Errorf("%s requires a delimiter and text", name)
+	}
+
+	delimiter := rest[0]
+	parts, err := splitByDelimiter(rest[1:], delimiter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parts) < 1 || parts[0] == "" {
+		return nil, fmt.Errorf("%s requires text", name)
+	}
+
+	switch name {
+	case "begin":
+		return rule.NewBeginRule(parts[0]), nil
+	case "end":
+		return rule.NewEndRule(parts[0]), nil
+	case "border":
+		return rule.NewBorderRule(parts[0]), nil
+	default:
+		return nil, fmt.Errorf("unknown document text command: %s", name)
+	}
+}
+
 // parseXargs parses "xargs/command/" and returns a LineRule that runs the command for each line.
 func parseXargs(input string) (rule.LineRule, error) {
 	rest := input[5:] // skip "xargs"
@@ -539,6 +592,104 @@ func parseIf(input string) (*condition, error) {
 	}
 
 	return &condition{
+		pattern:  compiled,
+		inverted: inverted,
+	}, nil
+}
+
+// ifAnyCondition is a parser-internal type for ifany/!ifany conditions.
+type ifAnyCondition struct {
+	pattern  *regexp2.Regexp
+	inverted bool
+}
+
+// parseIfAny parses "ifany/pattern/" or "!ifany/pattern/" and returns an ifAnyCondition.
+func parseIfAny(input string) (*ifAnyCondition, error) {
+	inverted := false
+	rest := input
+
+	if strings.HasPrefix(rest, "!ifany") {
+		inverted = true
+		rest = rest[6:]
+	} else {
+		rest = rest[5:]
+	}
+
+	if len(rest) == 0 {
+		return nil, fmt.Errorf("missing pattern in ifany condition")
+	}
+
+	delimiter := rest[0]
+	parts, err := splitByDelimiter(rest[1:], delimiter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parts) < 1 || parts[0] == "" {
+		return nil, fmt.Errorf("missing pattern in ifany condition")
+	}
+
+	pattern := parts[0]
+	if delimiter == '`' || delimiter == '\'' || delimiter == '"' {
+		pattern = regexp2.Escape(pattern)
+	}
+
+	opts := flagsFromParts(parts, 1)
+	compiled, err := rule.CompilePattern(pattern, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pattern in ifany condition: %w", err)
+	}
+
+	return &ifAnyCondition{
+		pattern:  compiled,
+		inverted: inverted,
+	}, nil
+}
+
+// ifNoneCondition is a parser-internal type for ifnone/!ifnone conditions.
+type ifNoneCondition struct {
+	pattern  *regexp2.Regexp
+	inverted bool
+}
+
+// parseIfNone parses "ifnone/pattern/" or "!ifnone/pattern/" and returns an ifNoneCondition.
+func parseIfNone(input string) (*ifNoneCondition, error) {
+	inverted := false
+	rest := input
+
+	if strings.HasPrefix(rest, "!ifnone") {
+		inverted = true
+		rest = rest[7:]
+	} else {
+		rest = rest[6:]
+	}
+
+	if len(rest) == 0 {
+		return nil, fmt.Errorf("missing pattern in ifnone condition")
+	}
+
+	delimiter := rest[0]
+	parts, err := splitByDelimiter(rest[1:], delimiter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parts) < 1 || parts[0] == "" {
+		return nil, fmt.Errorf("missing pattern in ifnone condition")
+	}
+
+	pattern := parts[0]
+	if delimiter == '`' || delimiter == '\'' || delimiter == '"' {
+		pattern = regexp2.Escape(pattern)
+	}
+
+	opts := flagsFromParts(parts, 1)
+	compiled, err := rule.CompilePattern(pattern, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pattern in ifnone condition: %w", err)
+	}
+
+	return &ifNoneCondition{
 		pattern:  compiled,
 		inverted: inverted,
 	}, nil

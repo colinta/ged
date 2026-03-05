@@ -1,0 +1,24 @@
+- name: filter then substitute
+  args: [p/hello, s/o/0/g]
+  input: |
+    hello
+    world
+    hello world
+  output: |
+    hell0
+    hell0 w0rld
+
+- name: chained substitutions (first match only)
+  args: [s/a/b, s/b/c]
+  input: "abc"
+  output: "cbc\n"
+
+- name: delete before substitute
+  args: ['d/^#', s/foo/bar]
+  input: |
+    foo
+    # comment
+    foo bar
+  output: |
+    bar
+    bar bar

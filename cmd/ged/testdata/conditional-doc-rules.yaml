@@ -1,0 +1,115 @@
+# Tests for document rules (begin, end, border) inside conditional blocks.
+#
+# When a document rule runs inside if/between, it operates on the
+# "sub-document" of matching lines. The results are then woven back
+# into the original positions:
+#   - Each processed line fills the next matching slot
+#   - Extra lines (from begin/end/border expanding the sub-document)
+#     are appended after the last original line
+
+- name: if with begin
+  args: ["if/foo/", "{", "begin/-- start/", "}"]
+  input: |
+    foo
+    bar
+    foo
+  output: |
+    -- start
+    foo
+    bar
+    -- start
+    foo
+
+- name: if with end
+  args: ["if/foo/", "{", "end/-- end/", "}"]
+  input: |
+    foo
+    bar
+    foo
+  output: |
+    foo
+    -- end
+    bar
+    foo
+    -- end
+
+- name: if with border
+  args: ["if/foo/", "{", "border/---/", "}"]
+  input: |
+    foo
+    bar
+    foo
+  output: |
+    ---
+    foo
+    ---
+    bar
+    ---
+    foo
+    ---
+
+- name: if no match with begin, does not append
+  args: ["if/nomatch/", "{", "begin/header/", "}"]
+  input: |
+    a
+    b
+    c
+  output: |
+    a
+    b
+    c
+
+- name: between with begin
+  args: ["between/START/END/", "{", "begin/>> header/", "}"]
+  input: |
+    a
+    START
+    b
+    c
+    END
+    d
+  output: |
+    a
+    >> header
+    START
+    b
+    c
+    END
+    d
+
+- name: between with end
+  args: ["between/START/END/", "{", "end/<< footer/", "}"]
+  input: |
+    a
+    START
+    b
+    c
+    END
+    d
+  output: |
+    a
+    START
+    b
+    c
+    END
+    << footer
+    d
+
+- name: between with border
+  args: ["between/START/END/", "{", "border/~~~/", "}"]
+  input: |
+    a
+    START
+    b
+    c
+    END
+    d
+  output: |
+    a
+    ~~~
+    START
+    b
+    c
+    END
+    ~~~
+    d

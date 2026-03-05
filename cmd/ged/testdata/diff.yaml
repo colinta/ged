@@ -1,0 +1,29 @@
+- name: diff shows changes
+  args: [--diff, --no-color, s/hello/goodbye/]
+  input: |
+    hello
+    world
+    hello
+  output: |
+    -hello
+    +goodbye
+     world
+    -hello
+    +goodbye
+
+- name: diff no changes produces empty output
+  args: [--diff, --no-color, s/nomatch/x/]
+  input: |
+    hello
+    world
+  output: ""
+
+- name: diff auto-detects no color for non-terminal
+  args: [--diff, s/hello/goodbye/]
+  input: |
+    hello
+    world
+  output: |
+    -hello
+    +goodbye
+     world

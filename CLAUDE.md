@@ -26,9 +26,11 @@ You are a professional go developer and are teaching me the basics of Go by writ
 | 13 | ✅ Moved to 7b | Control flow rules (done early, needed LineContext) |
 | 14 | ✅ Complete | External commands (`xargs`, `exec`) |
 | 15 | ✅ Complete | Diff output and colors (`--diff`, `--color`, `--no-color`) |
-| 16-20 | 🔲 Pending | More rules, polish |
+| 16 | ✅ Complete | More document rules (`lines`, `begin`, `end`, `border`, `count`, `uniq`) |
+| 17 | ✅ Complete | Advanced conditionals (`ifany`, `ifnone`, `else`) |
+| 18-20 | 🔲 Pending | Split/insert, error handling, polish |
 
-**To continue**: Run `go test ./...` to verify everything works, then start Phase 16.
+**To continue**: Run `go test ./...` to verify everything works, then start Phase 18.
 
 ## Lesson Files
 
@@ -64,8 +66,10 @@ Each phase introduces Go concepts. After completing a phase, create a lesson fil
 | `24-os-exec.md` | `os/exec`, `exec.Command`, shell quoting, stdin/stdout wiring |
 | `25-ansi-colors-and-tty-detection.md` | ANSI escape codes, `ModeCharDevice` TTY detection without external deps |
 | `26-lcs-diff-algorithm.md` | Longest Common Subsequence, dynamic programming, backtracking |
+| `27-fmt-sprintf.md` | `fmt.Sprintf`, format verbs, width padding, dynamic format strings |
+| `28-two-pass-document-conditions.md` | Two-pass processing: scan then transform, `ifany`/`ifnone` |
 
-**Next lesson number**: 27
+**Next lesson number**: 29
 
 ## Project Structure
 
@@ -103,6 +107,14 @@ ged/
 │   │   ├── group_rule.go        # GroupRule (extract capture group)
 │   │   ├── xargs_rule.go       # XargsRule (execute command per line)
 │   │   ├── exec_rule.go        # ExecRule (pipe document through command)
+│   │   ├── lines_rule.go       # LinesRule (prepend line numbers)
+│   │   ├── begin_rule.go       # BeginRule (prepend to document)
+│   │   ├── end_rule.go         # EndRule (append to document)
+│   │   ├── border_rule.go      # BorderRule (begin + end)
+│   │   ├── count_rule.go       # CountRule (output line count)
+│   │   ├── uniq_rule.go        # UniqRule (remove consecutive duplicates)
+│   │   ├── ifany_rule.go       # IfAnyDocRule (document-level any-match condition)
+│   │   ├── ifnone_rule.go      # IfNoneDocRule (document-level none-match condition)
 │   │   └── *_test.go            # Tests for each
 │   ├── parser/
 │   │   ├── parser.go            # Rule parsing (single rules + control rules)
@@ -1094,61 +1106,163 @@ echo "unchanged" | ged --diff 's/nomatch/x/'
 
 ---
 
-## Phase 16: More Document Rules
+## Phase 16: More Document Rules ✅ COMPLETE
 
-**Goal**: Implement `lines/`, `begin/`, `end/`, `border/`, `count`, `uniq`
+**Goal**: Implement `lines`, `begin`, `end`, `border`, `count`, `uniq`
 
-**Go Concepts Introduced**:
-- String formatting with `fmt.Sprintf`
-- Document manipulation patterns
+**Go Concepts Learned**:
+- **`fmt.Sprintf`**: Format strings without printing; `%5d` for width-padded integers
+- **Dynamic format strings**: Build format string at runtime based on data (e.g. line count width)
+- **Consecutive duplicate detection**: Compare `lines[i]` with `lines[i-1]` in a loop
 
-### Steps
+### Implementation Notes
 
-1. **Implement remaining document rules**:
-   - `LinesRule` - prepend line numbers
-   - `BeginRule` - prepend to document
-   - `EndRule` - append to document
-   - `BorderRule` - both begin and end
-   - `CountRule` - output line count
-   - `UniqueRule` - remove consecutive duplicates
+**Word Commands**: `lines`, `count`, `uniq` — no arguments needed.
 
-### Tests to Write
-- [ ] Lines numbers correctly
-- [ ] Begin prepends to document
-- [ ] End appends to document
-- [ ] Border does both
-- [ ] Count outputs number
-- [ ] Uniq removes consecutive duplicates
+**Text Commands**: `begin/text/`, `end/text/`, `border/text/` — take delimiter-separated text. The text supports `\n` escape sequences (from `splitByDelimiter`) for multi-line headers/footers.
+
+**LinesRule**: A `DocumentRule` because it needs the total line count upfront to calculate padding width. Uses a two-step `Sprintf` pattern: first build a format string like `"%3d: %s"`, then apply it per line.
+
+**Parser**: `parseDocTextCommand` helper handles `begin`/`end`/`border` — similar to `parseTextCommand` for line rules but returns `DocumentRule`.
+
+### Tests Written
+- [x] Lines: numbers lines, pads to width, single line, empty
+- [x] Begin: single line, multi-line, empty input
+- [x] End: single line, multi-line, empty input
+- [x] Border: single border, multi-line border, empty input
+- [x] Count: three lines, one line, empty
+- [x] Uniq: removes consecutive dupes, no dupes, all same, single, empty
+- [x] Parser: lines, count, uniq (word commands)
+- [x] Parser: begin, end, border (with delimiters), error cases
+- [x] CLI: lines, count, uniq, begin, end, border end-to-end
+- [x] CLI: sort then uniq (chained document rules)
+- [x] CLI: filter then count (line rule + document rule)
+
+### Files Created
+- `internal/rule/lines_rule.go` — LinesRule (DocumentRule)
+- `internal/rule/begin_rule.go` — BeginRule (DocumentRule)
+- `internal/rule/end_rule.go` — EndRule (DocumentRule)
+- `internal/rule/border_rule.go` — BorderRule (DocumentRule)
+- `internal/rule/count_rule.go` — CountRule (DocumentRule)
+- `internal/rule/uniq_rule.go` — UniqRule (DocumentRule)
+- `internal/rule/doc_rules_test.go` — Rule tests
+- `internal/parser/parse_docrules_test.go` — Parser tests
+
+### Files Modified
+- `internal/parser/parser.go` — Added word commands + `parseDocTextCommand` helper
+
+### Deliverable ✅
+```bash
+echo -e "alpha\nbeta\ngamma" | ged lines
+# Output: 1: alpha\n2: beta\n3: gamma
+
+echo -e "a\nb\nc" | ged count
+# Output: 3
+
+echo -e "a\na\nb\nb\na" | ged uniq
+# Output: a\nb\na
+
+echo -e "body" | ged 'begin/# Header/'
+# Output: # Header\nbody
+
+echo -e "content" | ged 'border/---/'
+# Output: ---\ncontent\n---
+
+echo -e "b\na\nb\na" | ged sort uniq
+# Output: a\nb
+
+echo -e "foo\nbar\nfoo\nbaz" | ged 'p/foo/' count
+# Output: 2
+```
 
 ---
 
-## Phase 17: Advanced Conditionals
+## Phase 17: Advanced Conditionals ✅ COMPLETE
 
 **Goal**: Implement `ifany/`, `ifnone/`, `else`
 
-**Go Concepts Introduced**:
-- Two-pass processing
-- Document-level conditions
-- Else clause handling
+**Go Concepts Learned**:
+- **Two-pass document conditions**: Scan all lines first, then decide whether to apply rules to all or none
+- **Shared helper extraction**: `applyLineRules` and `applyDocRules` eliminate pipeline duplication across rule types
+- **Else clauses**: Adding optional second branch to all conditional types (if, between, ifany, ifnone)
 
-### Steps
+### Implementation Notes
 
-1. **Implement IfAnyCondition**
-   - Scan entire document first
-   - Apply rules to all lines if any matches
+**Two New Rule Types** (both DocumentRule):
+- `IfAnyDocRule` — scans all lines; if ANY match, applies inner rules to ALL lines
+- `IfNoneDocRule` — scans all lines; if NONE match, applies inner rules to ALL lines
+- Both support `!` inversion and `else` clauses
 
-2. **Implement IfNoneCondition**
-   - Apply rules only if no lines match
+**Else Support**: Added `elseRules` field to all four existing conditional types:
+- `ConditionalLineRule` — else rules applied to non-matching lines
+- `ConditionalDocRule` — else rules applied to non-matching lines (per-line mini-documents)
+- `BetweenLineRule` — else rules applied to lines outside the range
+- `BetweenDocRule` — else rules applied to inactive segments
 
-3. **Implement else clause**
-   - `if/pattern/ { rules } else { other }`
+**Parser Changes**:
+- `ifany/pattern/` and `!ifany/pattern/` → `ifAnyCondition`
+- `ifnone/pattern/` and `!ifnone/pattern/` → `ifNoneCondition`
+- `else` keyword consumed after any condition's `}` block, expects `{ rules }`
+- Both ifany/ifnone always produce DocumentRules (need full scan)
 
-### Tests to Write
-- [ ] IfAny applies to all when one matches
-- [ ] IfAny applies to none when no match
-- [ ] IfNone applies when no match
-- [ ] Else clause works with if
-- [ ] Else clause works with between
+**Helper Extraction**: Refactored repeated pipeline code into:
+- `applyLineRules(line, ctx, rules)` — runs a LineRule pipeline on a single line
+- `applyDocRules(lines, rules)` — runs a DocumentRule pipeline on a document
+
+### Tests Written
+- [x] IfAny applies to all when one matches
+- [x] IfAny passes through when no match
+- [x] IfAny inverted (applies when no match)
+- [x] IfAny inverted with match (passes through)
+- [x] IfAny with else clause
+- [x] IfAny else not applied on match
+- [x] IfNone applies when no match
+- [x] IfNone passes through when match exists
+- [x] IfNone inverted (applies when match exists)
+- [x] IfNone with else clause
+- [x] IfNone else not applied on no match
+- [x] ConditionalLineRule else applied
+- [x] ConditionalDocRule else applied
+- [x] BetweenLineRule else applied
+- [x] BetweenDocRule else applied
+- [x] Parser: ifany, !ifany, ifnone, !ifnone
+- [x] Parser: literal delimiters, missing pattern errors
+- [x] ParseArgs: ifany block, ifnone block
+- [x] ParseArgs: if else (line rules), if else (doc rules)
+- [x] ParseArgs: ifany else, between else
+- [x] ParseArgs: else without if errors
+- [x] ParseArgs: else missing block errors
+- [x] CLI: 21 YAML integration tests covering all combinations
+
+### Files Created
+- `internal/rule/ifany_rule.go` — IfAnyDocRule + applyDocRules helper
+- `internal/rule/ifnone_rule.go` — IfNoneDocRule
+- `internal/rule/ifany_rule_test.go` — 12 rule tests
+- `internal/rule/conditional_else_test.go` — 4 else tests for existing types
+- `internal/parser/parse_advanced_cond_test.go` — 15 parser tests
+- `cmd/ged/testdata/advanced-conditionals.yaml` — 21 CLI integration tests
+- `lessons/28-two-pass-document-conditions.md`
+
+### Files Modified
+- `internal/rule/conditional_rule.go` — Added elseRules, extracted applyLineRules helper
+- `internal/rule/between_rule.go` — Added elseRules to both line/doc variants
+- `internal/parser/parser.go` — Added ifany/ifnone dispatch + parse functions
+- `internal/parser/parse_args.go` — Else handling for all condition types, toLineRules helper
+
+### Deliverable ✅
+```bash
+echo -e "ok\nerror here\nfine" | ged 'ifany/error/' '{' upper '}'
+# Output: OK\nERROR HERE\nFINE
+
+echo -e "ok\nfine" | ged 'ifnone/error/' '{' upper '}'
+# Output: OK\nFINE
+
+echo -e "hello\nworld" | ged 'if/hello/' '{' upper '}' 'else' '{' lower '}'
+# Output: HELLO\nworld
+
+echo -e "ok\nerror" | ged 'ifany/error/' '{' upper '}' 'else' '{' lower '}'
+# Output: OK\nERROR
+```
 
 ---
 

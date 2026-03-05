@@ -1,0 +1,78 @@
+- name: if applies rules to matches
+  args: ["if/hello/", "{", "s/o/x/", "}"]
+  input: |
+    hello
+    world
+    hello world
+  output: |
+    hellx
+    world
+    hellx world
+
+- name: inverted if
+  args: ["!if/hello/", "{", "s/o/x/", "}"]
+  input: |
+    hello
+    world
+    hello
+  output: |
+    hello
+    wxrld
+    hello
+
+- name: if with multiple inner rules
+  args: ["if/hello/", "{", "s/hello/hi/", "s/$/!/", "}"]
+  input: |
+    hello
+    world
+    hello world
+  output: |
+    hi!
+    world
+    hi world!
+
+- name: if then sort
+  args: ["if/x/", "{", "s/x/y/", "}", sort]
+  input: |
+    cx
+    a
+    bx
+  output: |
+    a
+    by
+    cy
+
+- name: if with document rule applies per-line (sort is no-op)
+  args: ["if/item/", "{", sort, "}"]
+  input: |
+    b_item
+    a_item
+    c_other
+    d_item
+  output: |
+    b_item
+    a_item
+    c_other
+    d_item
+
+- name: nested if
+  args: ["if/hello/", "{", "if/world/", "{", "s/world/earth/", "}", "}"]
+  input: |
+    hello
+    hello world
+    world
+  output: |
+    hello
+    hello earth
+    world
+
+- name: if ignore case
+  args: ["if/hello/i", "{", "s/$/!/", "}"]
+  input: |
+    Hello
+    world
+    HELLO
+  output: |
+    Hello!
+    world
+    HELLO!

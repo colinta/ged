@@ -13,6 +13,7 @@ func TestBetweenLineRule_AppliesInsideRange(t *testing.T) {
 		regexp2.MustCompile("END", 0),
 		false,
 		[]LineRule{mustSub(t, "x", "X")},
+		nil,
 	)
 	lines := []string{"before x", "START x", "middle x", "END x", "after x"}
 	got := applyBetweenLine(t, r, lines)
@@ -28,6 +29,7 @@ func TestBetweenLineRule_StartLineIncluded(t *testing.T) {
 		regexp2.MustCompile("END", 0),
 		false,
 		[]LineRule{mustSub(t, "^", "> ")},
+		nil,
 	)
 	lines := []string{"before", "START", "middle", "END", "after"}
 	got := applyBetweenLine(t, r, lines)
@@ -43,6 +45,7 @@ func TestBetweenLineRule_EndLineIncluded(t *testing.T) {
 		regexp2.MustCompile("END", 0),
 		false,
 		[]LineRule{mustSub(t, "o", "0")},
+		nil,
 	)
 	lines := []string{"foo", "START foo", "END foo", "foo"}
 	got := applyBetweenLine(t, r, lines)
@@ -58,6 +61,7 @@ func TestBetweenLineRule_NoMatchPassesThrough(t *testing.T) {
 		regexp2.MustCompile("END", 0),
 		false,
 		[]LineRule{mustSub(t, "x", "X")},
+		nil,
 	)
 	lines := []string{"a x", "b x", "c x"}
 	got := applyBetweenLine(t, r, lines)
@@ -73,6 +77,7 @@ func TestBetweenLineRule_MultipleRanges(t *testing.T) {
 		regexp2.MustCompile("END", 0),
 		false,
 		[]LineRule{mustSub(t, "x", "X")},
+		nil,
 	)
 	lines := []string{"x", "START x", "END x", "x", "START x", "END x", "x"}
 	got := applyBetweenLine(t, r, lines)
@@ -88,6 +93,7 @@ func TestBetweenLineRule_Inverted(t *testing.T) {
 		regexp2.MustCompile("END", 0),
 		true,
 		[]LineRule{mustSub(t, "x", "X")},
+		nil,
 	)
 	lines := []string{"x", "START x", "middle x", "END x", "x"}
 	got := applyBetweenLine(t, r, lines)
@@ -104,6 +110,7 @@ func TestBetweenLineRule_InnerDeleteRemovesLine(t *testing.T) {
 		regexp2.MustCompile("END", 0),
 		false,
 		[]LineRule{del},
+		nil,
 	)
 	lines := []string{"before", "START", "middle", "keep", "END", "after"}
 	got := applyBetweenLine(t, r, lines)
@@ -119,6 +126,7 @@ func TestBetweenLineRule_UnclosedRangeGoesToEnd(t *testing.T) {
 		regexp2.MustCompile("END", 0),
 		false,
 		[]LineRule{mustSub(t, "x", "X")},
+		nil,
 	)
 	lines := []string{"x", "START x", "x", "x"}
 	got := applyBetweenLine(t, r, lines)
@@ -134,6 +142,7 @@ func TestBetweenDocRule_SortsInsideRange(t *testing.T) {
 		regexp2.MustCompile("END", 0),
 		false,
 		[]DocumentRule{NewSortRule()},
+		nil,
 	)
 	lines := []string{"before", "START", "c", "a", "b", "END", "after"}
 	got, err := r.ApplyDocument(lines)
@@ -147,18 +156,23 @@ func TestBetweenDocRule_SortsInsideRange(t *testing.T) {
 }
 
 func TestBetweenDocRule_Inverted(t *testing.T) {
+	// Inverted: each outside segment is its own sub-document.
+	// Segment 1 (before): ["c", "a"] → sorted → ["a", "c"]
+	// Inside: ["START", "middle", "END"] passes through
+	// Segment 2 (after): ["b", "d"] → sorted → ["b", "d"]
 	r := NewBetweenDocRule(
 		regexp2.MustCompile("START", 0),
 		regexp2.MustCompile("END", 0),
 		true,
 		[]DocumentRule{NewSortRule()},
+		nil,
 	)
 	lines := []string{"c", "a", "START", "middle", "END", "b", "d"}
 	got, err := r.ApplyDocument(lines)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "a\nb\nSTART\nmiddle\nEND\nc\nd"
+	want := "a\nc\nSTART\nmiddle\nEND\nb\nd"
 	if strings.Join(got, "\n") != want {
 		t.Errorf("got %q, want %q", strings.Join(got, "\n"), want)
 	}

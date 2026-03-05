@@ -2,44 +2,13 @@ package rule
 
 import "github.com/dlclark/regexp2"
 
-// ConditionalLineRule implements LineRule. It applies inner LineRules only to
-// lines matching (or not matching) a condition. Non-matching lines pass through
-// unchanged. Because all inner rules are LineRules, this can stream.
-type ConditionalLineRule struct {
-	condition *regexp2.Regexp
-	inverted  bool
-	rules     []LineRule
-}
-
-// NewConditionalLineRule creates a ConditionalLineRule.
-func NewConditionalLineRule(condition *regexp2.Regexp, inverted bool, rules []LineRule) *ConditionalLineRule {
-	return &ConditionalLineRule{
-		condition: condition,
-		inverted:  inverted,
-		rules:     rules,
-	}
-}
-
-// Apply checks the condition and either runs inner rules or passes the line through.
-func (r *ConditionalLineRule) Apply(line string, ctx *LineContext) ([]string, error) {
-	matches, err := r.condition.MatchString(line)
-	if err != nil {
-		return nil, err
-	}
-	if r.inverted {
-		matches = !matches
-	}
-
-	if !matches {
-		return []string{line}, nil
-	}
-
-	// Apply inner rules as a pipeline — same pattern as ApplyAllRule
+// applyLineRules applies a pipeline of LineRules to a single line.
+func applyLineRules(line string, ctx *LineContext, rules []LineRule) ([]string, error) {
 	current := []string{line}
-	for _, innerRule := range r.rules {
+	for _, r := range rules {
 		var next []string
 		for _, l := range current {
-			out, err := innerRule.Apply(l, ctx)
+			out, err := r.Apply(l, ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -53,32 +22,72 @@ func (r *ConditionalLineRule) Apply(line string, ctx *LineContext) ([]string, er
 	return current, nil
 }
 
-// ConditionalDocRule implements DocumentRule. It collects lines matching the
-// condition into a sub-document, applies inner DocumentRules to that sub-document,
-// then weaves the results back into the original positions. Non-matching lines
-// stay in place.
+// ConditionalLineRule implements LineRule. It applies inner LineRules only to
+// lines matching (or not matching) a condition. Non-matching lines pass through
+// unchanged (or have elseRules applied). Because all inner rules are LineRules,
+// this can stream.
+type ConditionalLineRule struct {
+	condition *regexp2.Regexp
+	inverted  bool
+	rules     []LineRule
+	elseRules []LineRule
+}
+
+// NewConditionalLineRule creates a ConditionalLineRule.
+func NewConditionalLineRule(condition *regexp2.Regexp, inverted bool, rules []LineRule, elseRules []LineRule) *ConditionalLineRule {
+	return &ConditionalLineRule{
+		condition: condition,
+		inverted:  inverted,
+		rules:     rules,
+		elseRules: elseRules,
+	}
+}
+
+// Apply checks the condition and either runs inner rules or else rules.
+func (r *ConditionalLineRule) Apply(line string, ctx *LineContext) ([]string, error) {
+	matches, err := r.condition.MatchString(line)
+	if err != nil {
+		return nil, err
+	}
+	if r.inverted {
+		matches = !matches
+	}
+
+	if matches {
+		return applyLineRules(line, ctx, r.rules)
+	}
+	if len(r.elseRules) > 0 {
+		return applyLineRules(line, ctx, r.elseRules)
+	}
+	return []string{line}, nil
+}
+
+// ConditionalDocRule implements DocumentRule. It applies inner rules to matching
+// lines and elseRules to non-matching lines. Each line is processed independently
+// as a mini-document.
 type ConditionalDocRule struct {
 	condition *regexp2.Regexp
 	inverted  bool
 	rules     []DocumentRule
+	elseRules []DocumentRule
 }
 
 // NewConditionalDocRule creates a ConditionalDocRule.
-func NewConditionalDocRule(condition *regexp2.Regexp, inverted bool, rules []DocumentRule) *ConditionalDocRule {
+func NewConditionalDocRule(condition *regexp2.Regexp, inverted bool, rules []DocumentRule, elseRules []DocumentRule) *ConditionalDocRule {
 	return &ConditionalDocRule{
 		condition: condition,
 		inverted:  inverted,
 		rules:     rules,
+		elseRules: elseRules,
 	}
 }
 
-// ApplyDocument collects matching lines, applies inner rules, then reconstructs
-// the output with processed lines replacing their original positions.
+// ApplyDocument processes each line independently: matching lines have rules
+// applied, non-matching lines have elseRules applied (or pass through unchanged).
 func (r *ConditionalDocRule) ApplyDocument(lines []string) ([]string, error) {
-	var matchingLines []string
-	isMatch := make([]bool, len(lines))
+	var result []string
 
-	for i, line := range lines {
+	for _, line := range lines {
 		matches, err := r.condition.MatchString(line)
 		if err != nil {
 			return nil, err
@@ -86,41 +95,27 @@ func (r *ConditionalDocRule) ApplyDocument(lines []string) ([]string, error) {
 		if r.inverted {
 			matches = !matches
 		}
+
+		var activeRules []DocumentRule
 		if matches {
-			matchingLines = append(matchingLines, line)
-			isMatch[i] = true
+			activeRules = r.rules
+		} else if len(r.elseRules) > 0 {
+			activeRules = r.elseRules
 		}
-	}
 
-	// Apply inner document rules to the matching lines
-	processed := matchingLines
-	for _, dr := range r.rules {
-		var err error
-		processed, err = dr.ApplyDocument(processed)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Reconstruct: non-matching lines stay in place,
-	// processed lines fill in where matching lines were.
-	var result []string
-	processedIdx := 0
-	for i, line := range lines {
-		if isMatch[i] {
-			if processedIdx < len(processed) {
-				result = append(result, processed[processedIdx])
-				processedIdx++
-			}
-			// else: inner rules consumed this line (e.g. join reduced line count)
-		} else {
+		if activeRules == nil {
 			result = append(result, line)
+			continue
 		}
-	}
-	// Append any extra lines produced by inner rules
-	for processedIdx < len(processed) {
-		result = append(result, processed[processedIdx])
-		processedIdx++
+
+		processed := []string{line}
+		for _, dr := range activeRules {
+			processed, err = dr.ApplyDocument(processed)
+			if err != nil {
+				return nil, err
+			}
+		}
+		result = append(result, processed...)
 	}
 
 	return result, nil

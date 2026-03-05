@@ -1,0 +1,67 @@
+- name: trim
+  args: [trim]
+  input: "  hello  "
+  output: "hello\n"
+
+- name: trim left
+  args: [triml]
+  input: "  hello  "
+  output: "hello  \n"
+
+- name: trim right
+  args: [trimr]
+  input: "  hello  "
+  output: "  hello\n"
+
+- name: upper
+  args: [upper]
+  input: "hello World"
+  output: "HELLO WORLD\n"
+
+- name: lower
+  args: [lower]
+  input: "Hello WORLD"
+  output: "hello world\n"
+
+- name: prepend
+  args: ["prepend/>> /"]
+  input: |
+    hello
+    world
+  output: |
+    >> hello
+    >> world
+
+- name: append
+  args: ["append/ <</"]
+  input: |
+    hello
+    world
+  output: |
+    hello <<
+    world <<
+
+- name: surround
+  args: ["surround/[/]/"]
+  input: |
+    hello
+    world
+  output: |
+    [hello]
+    [world]
+
+- name: trim then upper
+  args: [trim, upper]
+  input: "  hello  "
+  output: "HELLO\n"
+
+- name: if with prepend
+  args: ["if/foo/", "{", "prepend/>> /", "}"]
+  input: |
+    foo
+    bar
+    foo
+  output: |
+    >> foo
+    bar
+    >> foo

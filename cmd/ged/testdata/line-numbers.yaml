@@ -1,0 +1,46 @@
+- name: print line range
+  args: ["p:2-4"]
+  input: |
+    one
+    two
+    three
+    four
+    five
+  output: |
+    two
+    three
+    four
+
+- name: delete line range
+  args: ["d:2-4"]
+  input: |
+    one
+    two
+    three
+    four
+    five
+  output: |
+    one
+    five
+
+- name: substitute by line number
+  args: ["s:2:replaced"]
+  input: |
+    one
+    two
+    three
+  output: |
+    one
+    replaced
+    three
+
+- name: substitute line range
+  args: ["s:1-2:X"]
+  input: |
+    one
+    two
+    three
+  output: |
+    X
+    X
+    three
