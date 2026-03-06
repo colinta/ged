@@ -22,6 +22,7 @@ class Ged < Formula
   depends_on "node" => :build
 
   def install
+    ENV["CGO_ENABLED"] = "0"
     system "go", "build", *std_go_args(ldflags: "-s -w"), "./cmd/ged"
     system "npx", "marked-man", "README.md", "--output", "ged.1"
     man1.install "ged.1"
