@@ -29,6 +29,7 @@ You are a professional go developer and are teaching me the basics of Go by writ
 | 16 | ✅ Complete | More document rules (`lines`, `begin`, `end`, `border`, `count`, `uniq`) |
 | 17 | ✅ Complete | Advanced conditionals (`ifany`, `ifnone`, `else`) |
 | 18 | ✅ Complete | Split and insert (`split/pattern/`, `insert/pattern/text/`) |
+| 18b | 🔲 Pending | Context lines for print/delete (`p/pat/context=2`, `d/pat/after=1`) |
 | 19-20 | 🔲 Pending | Error handling, polish |
 
 **To continue**: Run `go test ./...` to verify everything works, then start Phase 19.
@@ -1321,6 +1322,109 @@ echo "start" | ged 'insert/start/line1\nline2/'
 
 ---
 
+## Phase 18b: Context Lines for Print/Delete
+
+**Goal**: Add named options (`context=N`, `before=N`, `after=N`) to `p/pattern/` and `d/pattern/` so they can include surrounding lines, like `grep -C`.
+
+**Go Concepts Introduced**:
+- **Named option parsing**: Extending the delimiter-based flag system with `key=value` pairs
+- **LineRule → DocumentRule promotion**: When context is requested, a per-line rule must become a document-level rule that can look ahead/behind
+- **Boolean array marking**: Scanning all lines first, marking which to include, then collecting results
+- **`strconv.Atoi` in option parsing**: Parsing numeric values from `key=value` strings
+
+### Design: Named Options
+
+Named options extend the existing flags position. After splitting by delimiter, trailing parts are scanned for `key=value` patterns. Anything without `=` is treated as flags (backward-compatible).
+
+```
+p/error/context=2          # 2 lines before + match + 2 lines after
+p/error/i/context=2        # case-insensitive + context 2
+p/error/before=1,after=3   # 1 line before, 3 lines after (comma-separated)
+d/debug/context=1           # delete match + 1 surrounding line each side
+d/TODO/after=2              # delete match + 2 lines after it
+```
+
+Supported named options:
+- `context=N` — shorthand for `before=N,after=N`
+- `before=N` — include/delete N lines before each match
+- `after=N` — include/delete N lines after each match
+
+Multiple options are comma-separated within a single delimiter section: `before=1,after=3`
+
+### Architecture: DocumentRule Promotion
+
+Current `PrintLineRule` and `DeleteLineRule` are `LineRule`s — they see one line at a time. With context, they need the whole document to look ahead/behind.
+
+**Approach**: Create new `PrintContextRule` and `DeleteContextRule` as `DocumentRule`s:
+1. Scan all lines, find matches
+2. For each match, mark the range `[match-before, match+after]` as included/excluded
+3. Collect marked lines (print) or unmarked lines (delete)
+4. Overlapping ranges merge naturally via the boolean array
+
+The original `PrintLineRule`/`DeleteLineRule` stay unchanged for the no-context case (efficiency — no need to buffer the whole document for simple filtering).
+
+The parser decides which to create: if any context options are present, create the DocumentRule variant; otherwise, create the existing LineRule variant.
+
+### Steps
+
+1. **Add named option parsing to parser**
+   - `parseNamedOptions(part string) map[string]int` for `key=value` pairs
+   - Integrate into `flagsFromParts` or add alongside it
+   - Parse `context`, `before`, `after` as integer values
+
+2. **Implement PrintContextRule (DocumentRule)**
+   - Scan all lines for pattern matches
+   - Build boolean include-array with before/after expansion
+   - Return included lines
+
+3. **Implement DeleteContextRule (DocumentRule)**
+   - Same scanning, but return lines NOT in the marked range
+
+4. **Update parser to choose rule variant**
+   - `parsePrint`/`parseDelete` check for named options
+   - Context present → DocumentRule variant
+   - No context → existing LineRule variant (backward compatible)
+
+### Tests to Write
+- [ ] PrintContextRule: context=1 includes 1 before + match + 1 after
+- [ ] PrintContextRule: context=2 with match near start (no lines before)
+- [ ] PrintContextRule: context=2 with match near end (no lines after)
+- [ ] PrintContextRule: overlapping context ranges merge
+- [ ] PrintContextRule: multiple matches with context
+- [ ] PrintContextRule: before=1,after=0 (asymmetric)
+- [ ] PrintContextRule: before=0,after=2 (asymmetric)
+- [ ] PrintContextRule: context=0 (same as plain print)
+- [ ] PrintContextRule: case-insensitive flag + context
+- [ ] DeleteContextRule: context=1 removes match + surrounding
+- [ ] DeleteContextRule: overlapping delete ranges
+- [ ] DeleteContextRule: before=2,after=0
+- [ ] DeleteContextRule: no match returns all lines
+- [ ] Parser: p/pat/context=2 creates DocumentRule
+- [ ] Parser: p/pat/i/context=2 (flags + named options)
+- [ ] Parser: p/pat/before=1,after=3
+- [ ] Parser: d/pat/context=1 creates DocumentRule
+- [ ] Parser: p/pat/ without context still creates LineRule (backward compat)
+- [ ] Parser: invalid context value errors
+- [ ] CLI: print with context, delete with context, asymmetric, overlapping, chained
+
+### Deliverable
+```bash
+echo -e "a\nb\nerror here\nc\nd" | ged 'p/error/context=1'
+# Output: b\nerror here\nc
+
+echo -e "1\n2\n3\n4\n5\n6\n7" | ged 'p/3/before=1,after=2'
+# Output: 2\n3\n4\n5
+
+echo -e "a\nb\nDEBUG: x\nc\nd" | ged 'd/DEBUG/context=1'
+# Output: a\nc\nd
+
+echo -e "a\nERR 1\nb\nc\nERR 2\nd" | ged 'p/ERR/context=1'
+# Output: a\nERR 1\nb\nc\nERR 2\nd
+# (overlapping ranges merge — each line appears at most once)
+```
+
+---
+
 ## Phase 19: Error Handling and Help
 
 **Goal**: Comprehensive error messages, `--help`, `--explain`
@@ -1403,6 +1507,7 @@ After each phase, you should be comfortable with:
 | 14 | os/exec, subprocesses |
 | 15 | Terminal I/O, ANSI codes |
 | 16-18 | Pattern consolidation |
+| 18b | Named option parsing, LineRule→DocumentRule promotion, boolean marking |
 | 19 | Error handling patterns |
 | 20 | Benchmarking, optimization |
 
