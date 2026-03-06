@@ -10,7 +10,7 @@ class Ged < Formula
   desc "Streaming text editor for pipelines — modern sed alternative"
   homepage "https://github.com/colinta/ged"
   # Update URL and sha256 for each release:
-  url "https://github.com/colinta/ged/archive/refs/tags/v0.1.0.tar.gz"
+  url "https://github.com/colinta/ged/archive/refs/tags/1.0.0.tar.gz"
   sha256 "REPLACE_WITH_ACTUAL_SHA256"
   license "MIT"
 
