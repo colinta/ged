@@ -340,3 +340,41 @@ func TestRun_DiffWithColor(t *testing.T) {
 		t.Errorf("expected green ANSI code in colored diff, got:\n%s", got)
 	}
 }
+
+// --- Help tests ---
+
+func TestRun_Help(t *testing.T) {
+	out := &bytes.Buffer{}
+	err := run([]string{"--help"}, nil, out, io.Discard)
+	if err != nil {
+		t.Fatalf("--help returned error: %v", err)
+	}
+	got := out.String()
+	if !strings.Contains(got, "ged — a streaming text editor") {
+		t.Errorf("--help missing title, got:\n%s", got[:100])
+	}
+	if !strings.Contains(got, "s/pattern/replacement/") {
+		t.Errorf("--help missing substitution syntax")
+	}
+}
+
+func TestRun_HelpShort(t *testing.T) {
+	out := &bytes.Buffer{}
+	err := run([]string{"-h"}, nil, out, io.Discard)
+	if err != nil {
+		t.Fatalf("-h returned error: %v", err)
+	}
+	if !strings.Contains(out.String(), "ged — a streaming text editor") {
+		t.Errorf("-h should show help text")
+	}
+}
+
+func TestRun_NoArgs(t *testing.T) {
+	err := run([]string{}, nil, io.Discard, io.Discard)
+	if err == nil {
+		t.Fatal("expected error with no args")
+	}
+	if !strings.Contains(err.Error(), "--help") {
+		t.Errorf("no-args error should mention --help, got: %v", err)
+	}
+}

@@ -30,9 +30,10 @@ You are a professional go developer and are teaching me the basics of Go by writ
 | 17 | ✅ Complete | Advanced conditionals (`ifany`, `ifnone`, `else`) |
 | 18 | ✅ Complete | Split and insert (`split/pattern/`, `insert/pattern/text/`) |
 | 18b | ✅ Complete | Context lines for print/delete (`p/pat/context=2`, `d/pat/after=1`) |
-| 19-20 | 🔲 Pending | Error handling, polish |
+| 19 | ✅ Complete | Help text (`--help`) and explain mode (`--explain`) |
+| 20 | 🔲 Pending | Polish and performance |
 
-**To continue**: Run `go test ./...` to verify everything works, then start Phase 19.
+**To continue**: Run `go test ./...` to verify everything works, then start Phase 20.
 
 ## Lesson Files
 
@@ -71,7 +72,9 @@ Each phase introduces Go concepts. After completing a phase, create a lesson fil
 | `27-fmt-sprintf.md` | `fmt.Sprintf`, format verbs, width padding, dynamic format strings |
 | `28-two-pass-document-conditions.md` | Two-pass processing: scan then transform, `ifany`/`ifnone` |
 
-**Next lesson number**: 29
+| `29-optional-explainer-interface.md` | Optional interfaces, type assertions, single-file method definition |
+
+**Next lesson number**: 30
 
 ## Project Structure
 
@@ -1460,33 +1463,45 @@ echo -e "a\nERR 1\nb\nc\nERR 2\nd" | ged 'p/ERR/context=1'
 
 ---
 
-## Phase 19: Error Handling and Help
+## Phase 19: Help and Explain ✅ COMPLETE
 
-**Goal**: Comprehensive error messages, `--help`, `--explain`
+**Goal**: `--help` for usage info, `--explain` for rule descriptions in plain English.
 
-**Go Concepts Introduced**:
-- Custom error types
-- `errors.Is` and `errors.As`
-- Help text generation
-- Explanation mode
+**Go Concepts Learned**:
+- **Optional interface for self-description**: `Explainer` interface with `Explain() string` — rules implement it to describe themselves
+- **Const string blocks**: Multi-line `const helpText = ...` for static help text
+- **Recursive explain**: Conditional rules call `Explain()` on their inner rules with indentation
 
-### Steps
+### Implementation Notes
 
-1. **Create structured error types**
-   - `ParseError` with position info
-   - `RuleError` with rule context
+**`--help` / `-h`**: Prints comprehensive usage with all rule types, flags, options, delimiters, and examples. Short-circuits before rule parsing (no rules required).
 
-2. **Implement --explain**
-   - Print what each rule does in plain English
+**`--explain`**: Parses rules normally, then calls `Explain()` on each. Numbered output shows the pipeline. Conditional rules recursively describe inner rules with indentation. Example:
+```
+$ ged --explain 'if/TODO/' '{' upper '}' 'else' '{' lower '}'
+1. if matching /TODO/:
+    convert to uppercase
+  else:
+    convert to lowercase
+```
 
-3. **Implement --help**
-   - Generate comprehensive help text
+**Explainer interface**: All 40 rule types implement `Explain() string`. Placed in a single `explain.go` file rather than scattered across every rule file.
 
-### Tests to Write
-- [ ] Parse errors include position
-- [ ] Rule errors include context
-- [ ] Help text is accurate
-- [ ] Explain describes rules correctly
+**Deferred**: Structured error types (`ParseError`, `RuleError`) — the existing error messages are already clear enough. Can add later if needed.
+
+### Tests Written
+- [x] --help shows title and syntax examples (2 tests)
+- [x] -h short flag works
+- [x] No-args error mentions --help
+- [x] --explain: substitution, global substitution, print, print+context, delete, multiple rules, sort, conditional, trim+upper chain, exec (10 YAML tests)
+
+### Files Created
+- `internal/rule/explain.go` — Explainer interface + Explain() for all 40 rule types
+- `cmd/ged/testdata/help-explain.yaml` — 10 YAML explain tests
+
+### Files Modified
+- `cmd/ged/main.go` — Added helpText const, --help/-h/--explain flags, runExplain()
+- `cmd/ged/main_test.go` — 3 help tests (--help, -h, no-args)
 
 ---
 

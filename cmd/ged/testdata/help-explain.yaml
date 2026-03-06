@@ -1,0 +1,52 @@
+# --help and --explain don't process input, so we test them differently.
+# These tests just verify the flags don't error and produce output.
+
+- name: explain substitution
+  args: ['--explain', 's/foo/bar/']
+  input: ""
+  output: "1. replace first match of /foo/ with \"bar\"\n"
+
+- name: explain global substitution
+  args: ['--explain', 's/foo/bar/g']
+  input: ""
+  output: "1. replace all matches of /foo/ with \"bar\"\n"
+
+- name: explain print
+  args: ['--explain', 'p/error/']
+  input: ""
+  output: "1. keep lines matching /error/\n"
+
+- name: explain print with context
+  args: ['--explain', 'p/error/context=2']
+  input: ""
+  output: "1. keep lines matching /error/ (with 2 before, 2 after context)\n"
+
+- name: explain delete
+  args: ['--explain', 'd/debug/']
+  input: ""
+  output: "1. delete lines matching /debug/\n"
+
+- name: explain multiple rules
+  args: ['--explain', 'p/error/', 's/old/new/', upper]
+  input: ""
+  output: "1. keep lines matching /error/\n2. replace first match of /old/ with \"new\"\n3. convert to uppercase\n"
+
+- name: explain sort
+  args: ['--explain', sort]
+  input: ""
+  output: "1. sort lines alphabetically\n"
+
+- name: explain conditional
+  args: ['--explain', 'if/foo/', '{', upper, '}']
+  input: ""
+  output: "1. if matching /foo/:\n    convert to uppercase\n"
+
+- name: explain trim upper chain
+  args: ['--explain', trim, upper]
+  input: ""
+  output: "1. trim whitespace from both ends\n2. convert to uppercase\n"
+
+- name: explain exec
+  args: ['--explain', 'exec/sort -n/']
+  input: ""
+  output: "1. pipe document through \"sort -n\"\n"
