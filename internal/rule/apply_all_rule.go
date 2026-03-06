@@ -59,5 +59,16 @@ func (r *ApplyAllRule) ApplyDocument(lines []string) ([]string, error) {
 		result = append(result, current...)
 	}
 
+	// Flush any rules that buffer output
+	for _, lr := range r.rules {
+		if f, ok := lr.(FlushRule); ok {
+			flushed, err := f.Flush(ctx)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, flushed...)
+		}
+	}
+
 	return result, nil
 }

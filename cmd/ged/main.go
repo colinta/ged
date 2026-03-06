@@ -388,7 +388,18 @@ func processStream(allParsed []any, input io.Reader, output io.Writer) error {
 				fmt.Fprintln(output, result)
 			}
 		}
-		return scanner.Err()
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+		// Flush any rules that buffer output (e.g. context-aware rules)
+		flushed, err := pipeline.Flush(ctx)
+		if err != nil {
+			return fmt.Errorf("error flushing rules: %w", err)
+		}
+		for _, result := range flushed {
+			fmt.Fprintln(output, result)
+		}
+		return nil
 	}
 
 	// Document rules exist — buffer all input.

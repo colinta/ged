@@ -46,3 +46,19 @@ func (p *Pipeline) Process(line string, ctx *rule.LineContext) ([]string, error)
 
 	return lines, nil
 }
+
+// Flush calls Flush on any rules that implement FlushRule.
+// Should be called after all lines have been processed.
+func (p *Pipeline) Flush(ctx *rule.LineContext) ([]string, error) {
+	var result []string
+	for _, r := range p.rules {
+		if f, ok := r.(rule.FlushRule); ok {
+			flushed, err := f.Flush(ctx)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, flushed...)
+		}
+	}
+	return result, nil
+}

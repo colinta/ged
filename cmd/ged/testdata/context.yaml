@@ -1,0 +1,84 @@
+- name: print with context=1
+  args: ['p/MATCH/context=1']
+  input: "a\nb\nMATCH\nc\nd"
+  output: "b\nMATCH\nc\n"
+
+- name: print with context=2
+  args: ['p/MATCH/context=2']
+  input: "a\nb\nc\nMATCH\nd\ne\nf"
+  output: "b\nc\nMATCH\nd\ne\n"
+
+- name: print match at start
+  args: ['p/MATCH/context=2']
+  input: "MATCH\na\nb\nc"
+  output: "MATCH\na\nb\n"
+
+- name: print match at end
+  args: ['p/MATCH/context=1']
+  input: "a\nb\nMATCH"
+  output: "b\nMATCH\n"
+
+- name: print before only
+  args: ['p/MATCH/before=2']
+  input: "a\nb\nc\nMATCH\nd"
+  output: "b\nc\nMATCH\n"
+
+- name: print after only
+  args: ['p/MATCH/after=2']
+  input: "a\nMATCH\nb\nc\nd"
+  output: "MATCH\nb\nc\n"
+
+- name: print overlapping contexts
+  args: ['p/M/context=1']
+  input: "a\nM1\nb\nM2\nc"
+  output: "a\nM1\nb\nM2\nc\n"
+
+- name: print no match with context
+  args: ['p/NOMATCH/context=2']
+  input: "a\nb\nc"
+  output: ""
+
+- name: print context with flags
+  args: ['p/match/i/context=1']
+  input: "a\nb\nMATCH\nc\nd"
+  output: "b\nMATCH\nc\n"
+
+- name: delete with context=1
+  args: ['d/MATCH/context=1']
+  input: "a\nb\nMATCH\nc\nd"
+  output: "a\nd\n"
+
+- name: delete after only
+  args: ['d/MATCH/after=2']
+  input: "a\nMATCH\nb\nc\nd"
+  output: "a\nd\n"
+
+- name: delete before only
+  args: ['d/MATCH/before=2']
+  input: "a\nb\nc\nMATCH\nd"
+  output: "a\nd\n"
+
+- name: delete no match with context
+  args: ['d/NOMATCH/context=2']
+  input: "a\nb\nc"
+  output: "a\nb\nc\n"
+
+- name: delete match at start
+  args: ['d/MATCH/context=1']
+  input: "MATCH\na\nb\nc"
+  output: "b\nc\n"
+
+- name: delete match at end
+  args: ['d/MATCH/context=1']
+  input: "a\nb\nMATCH"
+  output: "a\n"
+
+- name: print context then substitute
+  args: ['p/MATCH/context=1', 's/MATCH/FOUND/']
+  input: "a\nb\nMATCH\nc\nd"
+  output: "b\nFOUND\nc\n"
+
+- name: print context=0 same as plain print
+  args: ['p/MATCH/context=0']
+  input: "a\nMATCH\nb"
+  output: "MATCH\n"

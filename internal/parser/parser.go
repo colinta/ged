@@ -3,6 +3,7 @@ package parser
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/colinta/ged/internal/rule"
@@ -175,6 +176,66 @@ func flagsFromParts(parts []string, flagIndex int) []rule.RuleOption {
 		return parseFlags(parts[flagIndex])
 	}
 	return nil
+}
+
+// contextOptions holds parsed before/after context values.
+type contextOptions struct {
+	before int
+	after  int
+	has    bool // true if any context option was found
+}
+
+// parseContextOptions scans parts starting at startIndex for context options.
+// Recognized: context=N, before=N, after=N. Parts without = are skipped (flags).
+// Returns the parsed options and any error.
+func parseContextOptions(parts []string, startIndex int) (contextOptions, error) {
+	var ctx contextOptions
+	for i := startIndex; i < len(parts); i++ {
+		part := parts[i]
+		if !strings.Contains(part, "=") {
+			continue // skip flag strings
+		}
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		key, val := kv[0], kv[1]
+		n, err := strconv.Atoi(val)
+		if err != nil {
+			return ctx, fmt.Errorf("invalid value for %s: %q", key, val)
+		}
+		if n < 0 {
+			return ctx, fmt.Errorf("%s must be non-negative, got %d", key, n)
+		}
+		switch key {
+		case "context":
+			ctx.before = n
+			ctx.after = n
+			ctx.has = true
+		case "before":
+			ctx.before = n
+			ctx.has = true
+		case "after":
+			ctx.after = n
+			ctx.has = true
+		default:
+			return ctx, fmt.Errorf("unknown option: %s", key)
+		}
+	}
+	return ctx, nil
+}
+
+// flagsAndOptionsFromParts extracts both flags and context options from trailing parts.
+// Flags are parts without =, context options are parts with =.
+func flagsAndOptionsFromParts(parts []string, startIndex int) ([]rule.RuleOption, contextOptions, error) {
+	var opts []rule.RuleOption
+	for i := startIndex; i < len(parts); i++ {
+		if !strings.Contains(parts[i], "=") {
+			opts = append(opts, parseFlags(parts[i])...)
+		}
+	}
+	ctxOpts, err := parseContextOptions(parts, startIndex)
+	return opts, ctxOpts, err
 }
 
 // parseTextCommand handles word commands that take text arguments via delimiters.
@@ -372,7 +433,13 @@ func parsePrint(parts []string) (rule.LineRule, error) {
 		return nil, fmt.Errorf("print requires a pattern")
 	}
 
-	opts := flagsFromParts(parts, 1)
+	opts, ctxOpts, err := flagsAndOptionsFromParts(parts, 1)
+	if err != nil {
+		return nil, fmt.Errorf("print: %w", err)
+	}
+	if ctxOpts.has {
+		return rule.NewPrintContextRule(parts[0], ctxOpts.before, ctxOpts.after, opts...)
+	}
 	return rule.NewPrintLineRule(parts[0], opts...)
 }
 
@@ -395,7 +462,13 @@ func parseDelete(parts []string) (rule.LineRule, error) {
 		return nil, fmt.Errorf("delete requires a pattern")
 	}
 
-	opts := flagsFromParts(parts, 1)
+	opts, ctxOpts, err := flagsAndOptionsFromParts(parts, 1)
+	if err != nil {
+		return nil, fmt.Errorf("delete: %w", err)
+	}
+	if ctxOpts.has {
+		return rule.NewDeleteContextRule(parts[0], ctxOpts.before, ctxOpts.after, opts...)
+	}
 	return rule.NewDeleteLineRule(parts[0], opts...)
 }
 

@@ -29,7 +29,7 @@ You are a professional go developer and are teaching me the basics of Go by writ
 | 16 | ✅ Complete | More document rules (`lines`, `begin`, `end`, `border`, `count`, `uniq`) |
 | 17 | ✅ Complete | Advanced conditionals (`ifany`, `ifnone`, `else`) |
 | 18 | ✅ Complete | Split and insert (`split/pattern/`, `insert/pattern/text/`) |
-| 18b | 🔲 Pending | Context lines for print/delete (`p/pat/context=2`, `d/pat/after=1`) |
+| 18b | ✅ Complete | Context lines for print/delete (`p/pat/context=2`, `d/pat/after=1`) |
 | 19-20 | 🔲 Pending | Error handling, polish |
 
 **To continue**: Run `go test ./...` to verify everything works, then start Phase 19.
@@ -1322,7 +1322,7 @@ echo "start" | ged 'insert/start/line1\nline2/'
 
 ---
 
-## Phase 18b: Context Lines for Print/Delete
+## Phase 18b: Context Lines for Print/Delete ✅ COMPLETE
 
 **Goal**: Add rule-specific options (`context=N`, `before=N`, `after=N`) to `p/pattern/` and `d/pattern/` so they can include surrounding lines, like `grep -C`.
 
@@ -1436,6 +1436,27 @@ echo -e "a\nERR 1\nb\nc\nERR 2\nd" | ged 'p/ERR/context=1'
 # Output: a\nERR 1\nb\nc\nERR 2\nd
 # (overlapping ranges merge — each line appears at most once)
 ```
+
+### Tests Written
+- [x] PrintContextRule: 14 tests (context=1/2, near start/end, overlapping, asymmetric, no match, case-insensitive, adjacent)
+- [x] DeleteContextRule: 12 tests (context=1/2, after/before only, no match, start/end, overlapping, case-insensitive, large context)
+- [x] Parser: 17 tests (p/ and d/ with context, before, after, flags+options, errors, backward compat)
+- [x] CLI: 18 YAML integration tests (print/delete with context, asymmetric, chained, flags)
+
+### Files Created
+- `internal/rule/flush_rule.go` — FlushRule interface (end-of-document cleanup)
+- `internal/rule/print_context_test.go` — 14 tests
+- `internal/rule/delete_context_test.go` — 12 tests
+- `internal/parser/parse_context_test.go` — 17 tests
+- `cmd/ged/testdata/context.yaml` — 18 CLI tests
+
+### Files Modified
+- `internal/rule/print_line_rule.go` — Added context state machine (rolling buffer + after-counter)
+- `internal/rule/delete_line_rule.go` — Added context state machine (delay buffer + after-counter)
+- `internal/rule/apply_all_rule.go` — Calls FlushRule after processing loop
+- `internal/engine/pipeline.go` — Added Flush method for end-of-document cleanup
+- `internal/parser/parser.go` — Added contextOptions, parseContextOptions, flagsAndOptionsFromParts; updated parsePrint/parseDelete
+- `cmd/ged/main.go` — Added Pipeline.Flush call in streaming path
 
 ---
 
