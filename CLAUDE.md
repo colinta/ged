@@ -1324,99 +1324,113 @@ echo "start" | ged 'insert/start/line1\nline2/'
 
 ## Phase 18b: Context Lines for Print/Delete
 
-**Goal**: Add named options (`context=N`, `before=N`, `after=N`) to `p/pattern/` and `d/pattern/` so they can include surrounding lines, like `grep -C`.
+**Goal**: Add rule-specific options (`context=N`, `before=N`, `after=N`) to `p/pattern/` and `d/pattern/` so they can include surrounding lines, like `grep -C`.
 
 **Go Concepts Introduced**:
-- **Named option parsing**: Extending the delimiter-based flag system with `key=value` pairs
-- **LineRule → DocumentRule promotion**: When context is requested, a per-line rule must become a document-level rule that can look ahead/behind
-- **Boolean array marking**: Scanning all lines first, marking which to include, then collecting results
+- **Rule-specific option parsing**: Each rule's parse function handles its own `key=value` options from the delimiter-separated parts — no generic option system
+- **Rolling buffer via LineContext state**: Using `GetState`/`SetState` to maintain a circular buffer of recent lines and an after-counter across Apply calls
 - **`strconv.Atoi` in option parsing**: Parsing numeric values from `key=value` strings
 
-### Design: Named Options
+### Design: Rule-Owned Options
 
-Named options extend the existing flags position. After splitting by delimiter, trailing parts are scanned for `key=value` patterns. Anything without `=` is treated as flags (backward-compatible).
+Options are delimiter-separated parts that contain `=`. Each rule's parse function decides what options it supports. Parts without `=` are still treated as flags. This is **not** a generic system — `parsePrint` and `parseDelete` know about `context`, `before`, `after`; other rules don't change.
 
 ```
 p/error/context=2          # 2 lines before + match + 2 lines after
 p/error/i/context=2        # case-insensitive + context 2
-p/error/before=1,after=3   # 1 line before, 3 lines after (comma-separated)
+p/error/before=1/after=3   # 1 line before, 3 lines after (separate parts)
 d/debug/context=1           # delete match + 1 surrounding line each side
 d/TODO/after=2              # delete match + 2 lines after it
 ```
 
-Supported named options:
+Supported options (for `p` and `d` only):
 - `context=N` — shorthand for `before=N,after=N`
 - `before=N` — include/delete N lines before each match
 - `after=N` — include/delete N lines after each match
 
-Multiple options are comma-separated within a single delimiter section: `before=1,after=3`
+### Architecture: State-Based LineRule (No DocumentRule Promotion)
 
-### Architecture: DocumentRule Promotion
+The print/delete rules stay as `LineRule`s. When context options are present, the rule uses `LineContext` state to buffer and emit surrounding lines:
 
-Current `PrintLineRule` and `DeleteLineRule` are `LineRule`s — they see one line at a time. With context, they need the whole document to look ahead/behind.
+**PrintLineRule with context — state machine:**
+```
+State: { buffer: []string (rolling last N), afterCount: int }
 
-**Approach**: Create new `PrintContextRule` and `DeleteContextRule` as `DocumentRule`s:
-1. Scan all lines, find matches
-2. For each match, mark the range `[match-before, match+after]` as included/excluded
-3. Collect marked lines (print) or unmarked lines (delete)
-4. Overlapping ranges merge naturally via the boolean array
+On each line:
+  if match:
+    flush buffer → output (the "before" lines)
+    output match line
+    set afterCount = after
+    clear buffer
+  else if afterCount > 0:
+    output line (it's within "after" range)
+    afterCount--
+  else:
+    push to buffer (cap at `before`, drop oldest)
+    output nothing (for now — may be flushed later if match follows)
+```
 
-The original `PrintLineRule`/`DeleteLineRule` stay unchanged for the no-context case (efficiency — no need to buffer the whole document for simple filtering).
+Unflushed buffer lines at end-of-document are simply discarded — same as `grep -B`.
 
-The parser decides which to create: if any context options are present, create the DocumentRule variant; otherwise, create the existing LineRule variant.
+**DeleteLineRule with context** — inverse logic: suppress the match line plus surrounding lines, pass everything else through. Uses the same state approach: when a match is found, set a counter for how many subsequent lines to also suppress.
+
+For the "before" part of delete, the rule buffers recent lines and retroactively suppresses them when a match is found. Since `Apply` has already returned those lines, delete-with-before requires a different approach — the rule must **delay** output by `before` lines, only emitting them once it's clear no upcoming match will pull them into a delete range. This means the rule holds a buffer and emits lines that are `before+1` lines old.
 
 ### Steps
 
-1. **Add named option parsing to parser**
-   - `parseNamedOptions(part string) map[string]int` for `key=value` pairs
-   - Integrate into `flagsFromParts` or add alongside it
-   - Parse `context`, `before`, `after` as integer values
+1. **Add option parsing to `parsePrint` and `parseDelete`**
+   - Scan trailing parts for `key=value` pairs
+   - Parse `context`, `before`, `after` as integers
+   - Pass as constructor parameters to the rule
 
-2. **Implement PrintContextRule (DocumentRule)**
-   - Scan all lines for pattern matches
-   - Build boolean include-array with before/after expansion
-   - Return included lines
+2. **Extend PrintLineRule with context state**
+   - Add `before`, `after` fields
+   - Use `GetState`/`SetState` for rolling buffer and afterCount
+   - Buffer before-lines, flush on match, count after-lines
 
-3. **Implement DeleteContextRule (DocumentRule)**
-   - Same scanning, but return lines NOT in the marked range
+3. **Extend DeleteLineRule with context state**
+   - Buffer lines with `before`-sized delay
+   - On match, discard buffer + suppress afterCount lines
+   - Emit delayed lines that aren't within any delete range
 
-4. **Update parser to choose rule variant**
-   - `parsePrint`/`parseDelete` check for named options
-   - Context present → DocumentRule variant
-   - No context → existing LineRule variant (backward compatible)
+4. **Handle end-of-document flush**
+   - Print: discard unflushed buffer (no match followed)
+   - Delete: flush remaining delayed buffer (no match consumed them)
+   - May need a `FlushRule` interface or similar for end-of-pipeline cleanup
 
 ### Tests to Write
-- [ ] PrintContextRule: context=1 includes 1 before + match + 1 after
-- [ ] PrintContextRule: context=2 with match near start (no lines before)
-- [ ] PrintContextRule: context=2 with match near end (no lines after)
-- [ ] PrintContextRule: overlapping context ranges merge
-- [ ] PrintContextRule: multiple matches with context
-- [ ] PrintContextRule: before=1,after=0 (asymmetric)
-- [ ] PrintContextRule: before=0,after=2 (asymmetric)
-- [ ] PrintContextRule: context=0 (same as plain print)
-- [ ] PrintContextRule: case-insensitive flag + context
-- [ ] DeleteContextRule: context=1 removes match + surrounding
-- [ ] DeleteContextRule: overlapping delete ranges
-- [ ] DeleteContextRule: before=2,after=0
-- [ ] DeleteContextRule: no match returns all lines
-- [ ] Parser: p/pat/context=2 creates DocumentRule
-- [ ] Parser: p/pat/i/context=2 (flags + named options)
-- [ ] Parser: p/pat/before=1,after=3
-- [ ] Parser: d/pat/context=1 creates DocumentRule
-- [ ] Parser: p/pat/ without context still creates LineRule (backward compat)
-- [ ] Parser: invalid context value errors
-- [ ] CLI: print with context, delete with context, asymmetric, overlapping, chained
+- [ ] Print context=1: includes 1 before + match + 1 after
+- [ ] Print context=2 near start: no lines before available
+- [ ] Print context=2 near end: no lines after available
+- [ ] Print overlapping contexts: multiple matches, ranges merge naturally
+- [ ] Print before=1,after=0: asymmetric
+- [ ] Print before=0,after=2: asymmetric
+- [ ] Print context=0: same as plain print
+- [ ] Print with flags + context: case-insensitive + context
+- [ ] Print no match with context: outputs nothing
+- [ ] Delete context=1: removes match + 1 surrounding each side
+- [ ] Delete overlapping delete ranges
+- [ ] Delete before=2,after=0
+- [ ] Delete after=1: removes match + 1 line after
+- [ ] Delete no match with context: returns all lines
+- [ ] Parser: p/pat/context=2 (option parsed)
+- [ ] Parser: p/pat/i/context=2 (flags + option)
+- [ ] Parser: p/pat/before=1/after=3 (multiple options)
+- [ ] Parser: d/pat/context=1
+- [ ] Parser: p/pat/ without options still works (backward compat)
+- [ ] Parser: invalid option value errors (context=abc)
+- [ ] CLI: print with context, delete with context, asymmetric, chained with other rules
 
 ### Deliverable
 ```bash
 echo -e "a\nb\nerror here\nc\nd" | ged 'p/error/context=1'
 # Output: b\nerror here\nc
 
-echo -e "1\n2\n3\n4\n5\n6\n7" | ged 'p/3/before=1,after=2'
+echo -e "1\n2\n3\n4\n5\n6\n7" | ged 'p/3/before=1/after=2'
 # Output: 2\n3\n4\n5
 
 echo -e "a\nb\nDEBUG: x\nc\nd" | ged 'd/DEBUG/context=1'
-# Output: a\nc\nd
+# Output: a\nd
 
 echo -e "a\nERR 1\nb\nc\nERR 2\nd" | ged 'p/ERR/context=1'
 # Output: a\nERR 1\nb\nc\nERR 2\nd
@@ -1507,7 +1521,7 @@ After each phase, you should be comfortable with:
 | 14 | os/exec, subprocesses |
 | 15 | Terminal I/O, ANSI codes |
 | 16-18 | Pattern consolidation |
-| 18b | Named option parsing, LineRule→DocumentRule promotion, boolean marking |
+| 18b | Rule-owned option parsing, rolling buffer via LineContext state, delayed output |
 | 19 | Error handling patterns |
 | 20 | Benchmarking, optimization |
 
