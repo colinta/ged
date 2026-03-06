@@ -1,31 +1,47 @@
-# Homebrew formula for ged.
-# Canonical copy lives at: github.com/colinta/homebrew-ged/Formula/ged.rb
-#
-# To install:
-#   brew tap colinta/ged
-#   brew install ged
-#
-# To update for a new release:
-#   1. Tag and push: git tag X.Y.Z && git push origin --tags
-#   2. Get sha256: curl -sL https://github.com/colinta/ged/archive/refs/tags/X.Y.Z.tar.gz | shasum -a 256
-#   3. Update url + sha256 in homebrew-ged/Formula/ged.rb
-#   4. Push the tap repo
-#
 class Ged < Formula
   desc "Streaming text editor for pipelines — modern sed alternative"
   homepage "https://github.com/colinta/ged"
-  url "https://github.com/colinta/ged/archive/refs/tags/1.0.0.tar.gz"
-  sha256 "9699c77f4f26f99ed1161e80a287fe228b221488ebfb8773166f5767281c27f1"
+  version "1.0.0"
   license "MIT"
 
-  depends_on "go" => :build
-  depends_on "node" => :build
+  on_macos do
+    if Hardware::CPU.arm?
+      url "https://github.com/colinta/ged/releases/download/1.0.0/ged-darwin-arm64.tar.gz"
+      sha256 "82ee254cdfe4f0d9e928d71f0e760be6af9aacef944bea2596735899ad42e035"
 
-  def install
-    ENV["CGO_ENABLED"] = "0"
-    system "go", "build", *std_go_args(ldflags: "-s -w"), "./cmd/ged"
-    system "npx", "marked-man", "README.md", "--output", "ged.1"
-    man1.install "ged.1"
+      def install
+        bin.install "ged-darwin-arm64" => "ged"
+        man1.install "ged.1"
+      end
+    else
+      url "https://github.com/colinta/ged/releases/download/1.0.0/ged-darwin-amd64.tar.gz"
+      sha256 "d2e89761a3e07cedffe5db451976dc6917a83b62ef672a43777a21b01bad8dd6"
+
+      def install
+        bin.install "ged-darwin-amd64" => "ged"
+        man1.install "ged.1"
+      end
+    end
+  end
+
+  on_linux do
+    if Hardware::CPU.arm?
+      url "https://github.com/colinta/ged/releases/download/1.0.0/ged-linux-arm64.tar.gz"
+      sha256 "a1067fb096e2ddc18d31a807bce2c56e3752b91ed2796b56391486223c21e23c"
+
+      def install
+        bin.install "ged-linux-arm64" => "ged"
+        man1.install "ged.1"
+      end
+    else
+      url "https://github.com/colinta/ged/releases/download/1.0.0/ged-linux-amd64.tar.gz"
+      sha256 "943a566f65039e275b695805c91399ea5fd072f32cc67dca422598fe2617a99c"
+
+      def install
+        bin.install "ged-linux-amd64" => "ged"
+        man1.install "ged.1"
+      end
+    end
   end
 
   test do
