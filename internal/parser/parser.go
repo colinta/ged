@@ -95,6 +95,12 @@ func ParseRule(input string) (any, error) {
 	if strings.HasPrefix(input, "cols") {
 		return parseCols(input)
 	}
+	if strings.HasPrefix(input, "split") {
+		return parseSplit(input)
+	}
+	if strings.HasPrefix(input, "insert") {
+		return parseInsert(input)
+	}
 	if strings.HasPrefix(input, "xargs") {
 		return parseXargs(input)
 	}
@@ -506,6 +512,59 @@ func parseExec(input string) (rule.DocumentRule, error) {
 	}
 
 	return rule.NewExecRule(parts[0]), nil
+}
+
+// parseSplit parses "split/pattern/" and returns a SplitRule.
+func parseSplit(input string) (rule.LineRule, error) {
+	rest := input[5:] // skip "split"
+	if len(rest) == 0 {
+		return nil, fmt.Errorf("split requires a pattern")
+	}
+
+	delimiter := rest[0]
+	parts, err := splitByDelimiter(rest[1:], delimiter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parts) < 1 || parts[0] == "" {
+		return nil, fmt.Errorf("split requires a pattern")
+	}
+
+	pattern := parts[0]
+	if delimiter == '`' || delimiter == '\'' || delimiter == '"' {
+		pattern = regexp2.Escape(pattern)
+	}
+
+	opts := flagsFromParts(parts, 1)
+	return rule.NewSplitRule(pattern, opts...)
+}
+
+// parseInsert parses "insert/pattern/text/" and returns an InsertRule.
+func parseInsert(input string) (rule.LineRule, error) {
+	rest := input[6:] // skip "insert"
+	if len(rest) == 0 {
+		return nil, fmt.Errorf("insert requires a pattern and text")
+	}
+
+	delimiter := rest[0]
+	parts, err := splitByDelimiter(rest[1:], delimiter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parts) < 2 || parts[0] == "" {
+		return nil, fmt.Errorf("insert requires a pattern and text")
+	}
+
+	pattern := parts[0]
+	if delimiter == '`' || delimiter == '\'' || delimiter == '"' {
+		pattern = regexp2.Escape(pattern)
+	}
+
+	text := parts[1]
+	opts := flagsFromParts(parts, 2)
+	return rule.NewInsertRule(pattern, text, opts...)
 }
 
 // parseControl parses "name/pattern/" for control rules (on, off, after, toggle).

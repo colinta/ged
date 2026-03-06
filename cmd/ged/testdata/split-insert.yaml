@@ -1,0 +1,69 @@
+- name: split on comma
+  args: ['split/,/']
+  input: "a,b,c"
+  output: "a\nb\nc\n"
+
+- name: split on whitespace
+  args: ['split/\s+/']
+  input: "hello   world   foo"
+  output: "hello\nworld\nfoo\n"
+
+- name: split no match passes through
+  args: ['split/,/']
+  input: "no commas"
+  output: "no commas\n"
+
+- name: split multiline input
+  args: ['split/,/']
+  input: "a,b\nc,d"
+  output: "a\nb\nc\nd\n"
+
+- name: split then substitute
+  args: ['split/,/', 's/a/X/']
+  input: "a,b,a"
+  output: "X\nb\nX\n"
+
+- name: split inside if condition
+  args: ['if/csv/', '{', 'split/,/', '}']
+  input: "csv: a,b,c\nplain text"
+  output: "csv: a\nb\nc\nplain text\n"
+
+- name: split literal backtick
+  args: ['split`|`']
+  input: "a|b|c"
+  output: "a\nb\nc\n"
+
+- name: insert after heading
+  args: ['insert/^#/---/']
+  input: "# Title\nparagraph\n# Section\nmore text"
+  output: "# Title\n---\nparagraph\n# Section\n---\nmore text\n"
+
+- name: insert no match passes through
+  args: ['insert/^#/---/']
+  input: "just text\nno headings"
+  output: "just text\nno headings\n"
+
+- name: insert multi-line text
+  args: ['insert/start/line1\nline2/']
+  input: "start\nend"
+  output: "start\nline1\nline2\nend\n"
+
+- name: insert then substitute
+  args: ['insert/^#/---/', 's/---/===/']
+  input: "# Title\ntext"
+  output: "# Title\n===\ntext\n"
+
+- name: insert with case insensitive
+  args: ['insert/todo/FIXME/i']
+  input: "TODO: fix\nother\nTodo: also"
+  output: "TODO: fix\nFIXME\nother\nTodo: also\nFIXME\n"
+
+- name: split then sort
+  args: ['split/,/', sort]
+  input: "c,a,b"
+  output: "a\nb\nc\n"
+
+- name: split then join
+  args: ['split/,/', 'join/ | /']
+  input: "a,b,c"
+  output: "a | b | c\n"

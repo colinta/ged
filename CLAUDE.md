@@ -28,9 +28,10 @@ You are a professional go developer and are teaching me the basics of Go by writ
 | 15 | ✅ Complete | Diff output and colors (`--diff`, `--color`, `--no-color`) |
 | 16 | ✅ Complete | More document rules (`lines`, `begin`, `end`, `border`, `count`, `uniq`) |
 | 17 | ✅ Complete | Advanced conditionals (`ifany`, `ifnone`, `else`) |
-| 18-20 | 🔲 Pending | Split/insert, error handling, polish |
+| 18 | ✅ Complete | Split and insert (`split/pattern/`, `insert/pattern/text/`) |
+| 19-20 | 🔲 Pending | Error handling, polish |
 
-**To continue**: Run `go test ./...` to verify everything works, then start Phase 18.
+**To continue**: Run `go test ./...` to verify everything works, then start Phase 19.
 
 ## Lesson Files
 
@@ -115,6 +116,8 @@ ged/
 │   │   ├── uniq_rule.go        # UniqRule (remove consecutive duplicates)
 │   │   ├── ifany_rule.go       # IfAnyDocRule (document-level any-match condition)
 │   │   ├── ifnone_rule.go      # IfNoneDocRule (document-level none-match condition)
+│   │   ├── split_rule.go       # SplitRule (split line on pattern)
+│   │   ├── insert_rule.go      # InsertRule (insert text after matching lines)
 │   │   └── *_test.go            # Tests for each
 │   ├── parser/
 │   │   ├── parser.go            # Rule parsing (single rules + control rules)
@@ -1266,28 +1269,55 @@ echo -e "ok\nerror" | ged 'ifany/error/' '{' upper '}' 'else' '{' lower '}'
 
 ---
 
-## Phase 18: Split and Insert
+## Phase 18: Split and Insert ✅ COMPLETE
 
 **Goal**: Implement `split/pattern/` and `insert/pattern/text/`
 
-**Go Concepts Introduced**:
-- Rules that produce multiple outputs
-- Insertion patterns
+**Go Concepts**: No new concepts — reuses `regexSplit` from columns_rule.go and follows established LineRule patterns.
 
-### Steps
+### Implementation Notes
 
-1. **Implement SplitRule**
-   - Split line on pattern
-   - Return multiple lines
+**SplitRule** (LineRule) — Splits each line on regex matches, producing one output line per segment. Reuses the existing `regexSplit` function from `columns_rule.go` (same package, no extraction needed). Supports literal delimiters and case-insensitive flag.
 
-2. **Implement InsertRule**
-   - Insert new line after matching lines
+**InsertRule** (LineRule) — After each line matching the pattern, inserts one or more new lines of text. Non-matching lines pass through unchanged. The text supports `\n` for multi-line insertions (via `strings.Split`).
 
-### Tests to Write
-- [ ] Split produces multiple lines
-- [ ] Split handles no match
-- [ ] Insert adds line after match
-- [ ] Insert doesn't affect non-matches
+**Parser Syntax**:
+- `split/pattern/` — split on regex, optional flags: `split/and/i`
+- `insert/pattern/text/` — insert text after matches, optional flags: `insert/todo/FIXME/i`
+- Both support literal delimiters: `` split`,` ``, `` insert`#`---` ``
+
+### Tests Written
+- [x] SplitRule: comma, comma-space, whitespace, pipe, boundaries, empty, no match, case insensitive (9 tests)
+- [x] InsertRule: after match, no match, multi-line, empty text, regex, case insensitive, original unchanged (7 tests + 1 error test)
+- [x] Parser: split basic, alternate delimiter, flags, literal, errors (7 tests)
+- [x] Parser: insert basic, alternate delimiter, flags, literal, errors (8 tests)
+- [x] CLI: split, split multiline, split+substitute, split inside if, split literal, insert after heading, insert no match, insert multi-line, insert+substitute, insert case insensitive, split+sort, split+join (14 YAML tests)
+
+### Files Created
+- `internal/rule/split_rule.go` — SplitRule (LineRule)
+- `internal/rule/insert_rule.go` — InsertRule (LineRule)
+- `internal/rule/split_rule_test.go` — 9 tests
+- `internal/rule/insert_rule_test.go` — 8 tests
+- `internal/parser/parse_split_test.go` — 15 parser tests
+- `cmd/ged/testdata/split-insert.yaml` — 14 CLI integration tests
+
+### Files Modified
+- `internal/parser/parser.go` — Added `split`/`insert` dispatch + `parseSplit`, `parseInsert`
+
+### Deliverable ✅
+```bash
+echo "a,b,c" | ged 'split/,/'
+# Output: a\nb\nc
+
+echo "a,b,c" | ged 'split/,/' sort
+# Output: a\nb\nc
+
+echo -e "# Title\nparagraph\n# Section\nmore" | ged 'insert/^#/---/'
+# Output: # Title\n---\nparagraph\n# Section\n---\nmore
+
+echo "start" | ged 'insert/start/line1\nline2/'
+# Output: start\nline1\nline2
+```
 
 ---
 
