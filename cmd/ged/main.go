@@ -151,7 +151,7 @@ func parseCliOptions(args []string) (*cliOptions, error) {
 			continue
 		}
 
-		if arg == "--help" || arg == "-h" {
+		if arg == "--help" || arg == "-h" || arg == "help" {
 			opts.helpMode = true
 			continue
 		}
