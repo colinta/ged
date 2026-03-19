@@ -117,7 +117,8 @@ ged/
 │   │   ├── end_rule.go         # EndRule (append to document)
 │   │   ├── border_rule.go      # BorderRule (begin + end)
 │   │   ├── count_rule.go       # CountRule (output line count)
-│   │   ├── uniq_rule.go        # UniqRule (remove consecutive duplicates)
+│   │   ├── uniq_rule.go        # UniqRule (remove consecutive duplicates, optional pattern key)
+│   │   ├── uniq_rule_test.go  # UniqRule pattern tests
 │   │   ├── ifany_rule.go       # IfAnyDocRule (document-level any-match condition)
 │   │   ├── ifnone_rule.go      # IfNoneDocRule (document-level none-match condition)
 │   │   ├── split_rule.go       # SplitRule (split line on pattern)
@@ -1151,7 +1152,7 @@ echo "unchanged" | ged --diff 's/nomatch/x/'
 - `internal/rule/end_rule.go` — EndRule (DocumentRule)
 - `internal/rule/border_rule.go` — BorderRule (DocumentRule)
 - `internal/rule/count_rule.go` — CountRule (DocumentRule)
-- `internal/rule/uniq_rule.go` — UniqRule (DocumentRule)
+- `internal/rule/uniq_rule.go` — UniqRule (DocumentRule, optional pattern/group key)
 - `internal/rule/doc_rules_test.go` — Rule tests
 - `internal/parser/parse_docrules_test.go` — Parser tests
 
@@ -1180,6 +1181,12 @@ echo -e "b\na\nb\na" | ged sort uniq
 
 echo -e "foo\nbar\nfoo\nbaz" | ged 'p/foo/' count
 # Output: 2
+
+echo -e "abc one\n123 two\nabc three\n456 four" | ged 'uniq/^\w+/'
+# Output: abc one\n123 two\n456 four  (global dedup by first word)
+
+echo -e "1 abc x\n2 abc y\n3 def z" | ged 'uniq/^\d+ (\w+)/1'
+# Output: 1 abc x\n3 def z  (dedup by capture group 1)
 ```
 
 ---

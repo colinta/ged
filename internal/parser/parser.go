@@ -31,6 +31,9 @@ func ParseRule(input string) (any, error) {
 	if input == "uniq" {
 		return rule.NewUniqRule(), nil
 	}
+	if strings.HasPrefix(input, "uniq") {
+		return parseUniq(input)
+	}
 	if strings.HasPrefix(input, "begin") {
 		return parseDocTextCommand(input, "begin")
 	}
@@ -638,6 +641,49 @@ func parseInsert(input string) (rule.LineRule, error) {
 	text := parts[1]
 	opts := flagsFromParts(parts, 2)
 	return rule.NewInsertRule(pattern, text, opts...)
+}
+
+// parseUniq parses "uniq/pattern/", "uniq/pattern/flags", "uniq/pattern/group",
+// or "uniq/pattern/group/flags" (group and flags may appear in either order).
+// A single digit 1-9 is treated as a group number; anything else is flags.
+func parseUniq(input string) (rule.DocumentRule, error) {
+	rest := input[4:] // skip "uniq"
+	if len(rest) == 0 {
+		return nil, fmt.Errorf("uniq requires a pattern")
+	}
+
+	delimiter := rest[0]
+	parts, err := splitByDelimiter(rest[1:], delimiter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parts) < 1 || parts[0] == "" {
+		return nil, fmt.Errorf("uniq requires a pattern")
+	}
+
+	pattern := parts[0]
+	if delimiter == '`' || delimiter == '\'' || delimiter == '"' {
+		pattern = regexp2.Escape(pattern)
+	}
+
+	var opts []rule.RuleOption
+	groupNum := 0
+
+	// Scan remaining parts — each is either a group number or flags
+	for i := 1; i < len(parts); i++ {
+		part := parts[i]
+		if part == "" {
+			continue
+		}
+		if len(part) == 1 && part[0] >= '1' && part[0] <= '9' {
+			groupNum = int(part[0] - '0')
+		} else {
+			opts = append(opts, parseFlags(part)...)
+		}
+	}
+
+	return rule.NewUniqPatternRule(pattern, groupNum, opts...)
 }
 
 // parseControl parses "name/pattern/" for control rules (on, off, after, toggle).

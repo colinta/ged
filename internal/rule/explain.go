@@ -118,7 +118,16 @@ func (r *JoinRule) Explain() string {
 }
 func (r *LinesRule) Explain() string  { return "prepend line numbers" }
 func (r *CountRule) Explain() string  { return "output line count" }
-func (r *UniqRule) Explain() string   { return "remove consecutive duplicates" }
+func (r *UniqRule) Explain() string {
+	if r.pattern == nil {
+		return "remove consecutive duplicates"
+	}
+	desc := fmt.Sprintf("remove consecutive duplicates matching /%s/", r.pattern.String())
+	if r.groupNum > 0 {
+		desc += fmt.Sprintf(" (group %d)", r.groupNum)
+	}
+	return desc
+}
 func (r *BeginRule) Explain() string  { return fmt.Sprintf("prepend %q to document", r.text) }
 func (r *EndRule) Explain() string    { return fmt.Sprintf("append %q to document", r.text) }
 func (r *BorderRule) Explain() string { return fmt.Sprintf("add %q border to document", r.text) }

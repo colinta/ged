@@ -43,6 +43,7 @@ Document rules:
   lines                          Prepend line numbers
   count                          Output line count
   uniq                           Remove consecutive duplicates
+  uniq/pattern/[group]/[flags]   Remove duplicates by matched key (global)
   begin/text/                    Prepend text to document
   end/text/                      Append text to document
   border/text/                   Add text to both ends
@@ -123,6 +124,12 @@ ged 's/old/new/g' --input=file.txt --write
 
 # Show diff before editing
 ged 's/old/new/g' --input=file.txt --diff --color
+
+# Deduplicate by first word
+echo -e "abc one\n123 two\nabc three\n456 four" | ged 'uniq/^\w+/'
+
+# Deduplicate by capture group
+echo -e "1 abc x\n2 abc y\n3 def z" | ged 'uniq/^\d+ (\w+)/1'
 
 # Explain what rules do
 ged --explain 'p/error/i/context=2' 's/ERROR/WARNING/' upper

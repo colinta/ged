@@ -49,6 +49,7 @@ Document rules:
   lines                          Prepend line numbers
   count                          Output line count
   uniq                           Remove consecutive duplicates
+  uniq/pattern/[group]/[flags]   Remove duplicates by matched key (global)
   begin/text/                    Prepend text to document
   end/text/                      Append text to document
   border/text/                   Add text to both ends

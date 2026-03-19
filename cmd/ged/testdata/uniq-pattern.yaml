@@ -1,0 +1,44 @@
+- name: uniq with pattern deduplicates by match
+  args: ['uniq/^\w+/']
+  input: "abc this is a line\n123 this is something\nabc this is nice\n456 hello\n123 goodbye"
+  output: "abc this is a line\n123 this is something\n456 hello\n"
+
+- name: uniq with capture group
+  args: ['uniq/^\w+ (\w+) /1']
+  input: "111 abc this is a line\n111 123 this is something\n111 abc this is nice\n111 456 hello\n111 123 goodbye"
+  output: "111 abc this is a line\n111 123 this is something\n111 456 hello\n"
+
+- name: uniq with case insensitive flag
+  args: ['uniq/^\w+/i']
+  input: "Abc first\nabc second\nDef third\ndef fourth"
+  output: "Abc first\nDef third\n"
+
+- name: uniq pattern with no match falls back to full line
+  args: ['uniq/\d+/']
+  input: "abc\nabc\ndef"
+  output: "abc\ndef\n"
+
+- name: uniq pattern then sort
+  args: ['uniq/^\w+/', 'sort']
+  input: "cherry 1\napple 2\ncherry 3\nbanana 4"
+  output: "apple 2\nbanana 4\ncherry 1\n"
+
+- name: bare uniq still works (consecutive only)
+  args: ['uniq']
+  input: "a\na\nb\na"
+  output: "a\nb\na\n"
+
+- name: uniq with group then flags
+  args: ['uniq/^\w+ (\w+)/1/i']
+  input: "1 Abc x\n2 abc y\n3 DEF z\n4 def w"
+  output: "1 Abc x\n3 DEF z\n"
+
+- name: uniq with flags then group
+  args: ['uniq/^\w+ (\w+)/i/1']
+  input: "1 Abc x\n2 abc y\n3 DEF z\n4 def w"
+  output: "1 Abc x\n3 DEF z\n"
+
+- name: uniq pattern with alternate delimiter
+  args: ['uniq|^\w+|']
+  input: "foo 1\nfoo 2\nbar 3"
+  output: "foo 1\nbar 3\n"
