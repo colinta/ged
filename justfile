@@ -1,7 +1,10 @@
-homebrew_repo := "../homebrew-ged"
+version := `cat VERSION`
 
 build:
-    go build -o ged ./cmd/ged
+    go build -ldflags "-X main.version={{version}}" -o ged ./cmd/ged/
+
+install:
+    go install -ldflags "-X main.version={{version}}" ./cmd/ged/
 
 test:
     go test ./...

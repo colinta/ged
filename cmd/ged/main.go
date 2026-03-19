@@ -14,6 +14,9 @@ import (
 	"github.com/colinta/ged/internal/rule"
 )
 
+// version is set at build time via -ldflags "-X main.version=..."
+var version = "dev"
+
 const helpText = `ged — a streaming text editor for pipelines
 
 Usage: ged [flags] <rule> [rule...]
@@ -89,6 +92,7 @@ CLI flags:
   --no-color      Force plain output
   --explain       Describe what rules do
   --help, -h      Show this help
+  --version, -v   Show version
 
 Examples:
   echo "hello world" | ged 's/world/earth/'
@@ -121,6 +125,7 @@ type cliOptions struct {
 	diffMode    bool      // --diff: show diff instead of output
 	color       colorMode // --color / --no-color
 	helpMode    bool      // --help: show usage
+	versionMode bool      // --version: show version
 	explainMode bool      // --explain: describe rules in plain English
 	ruleArgs    []string  // remaining args that are rules
 }
@@ -153,6 +158,11 @@ func parseCliOptions(args []string) (*cliOptions, error) {
 
 		if arg == "--help" || arg == "-h" || arg == "help" {
 			opts.helpMode = true
+			continue
+		}
+
+		if arg == "--version" || arg == "-v" || arg == "version" {
+			opts.versionMode = true
 			continue
 		}
 
@@ -240,6 +250,11 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 
 	if opts.helpMode {
 		fmt.Fprint(stdout, helpText)
+		return nil
+	}
+
+	if opts.versionMode {
+		fmt.Fprintf(stdout, "ged %s\n", version)
 		return nil
 	}
 
