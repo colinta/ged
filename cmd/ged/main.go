@@ -85,15 +85,16 @@ Delimiters:
     s` + "`" + `foo.bar` + "`" + `baz` + "`" + `    matches "foo.bar" literally
 
 CLI flags:
-  --input=FILE    Read from file (repeatable)
-  --write         Write back to input file(s)
-  --write-to=FILE Write output to specific file
-  --diff          Show diff instead of output
-  --color         Force colored output
-  --no-color      Force plain output
-  --explain       Describe what rules do
-  --help, -h      Show this help
-  --version, -v   Show version
+  --input=FILE       Read from file (repeatable)
+  --write            Write back to input file(s)
+  --write-to=FILE    Write output to specific file
+  --diff             Show diff instead of output
+  --color            Force colored output
+  --no-color         Force plain output
+  --insensitive, -i  Case-insensitive matching for all rules
+  --explain          Describe what rules do
+  --help, -h         Show this help
+  --version, -v      Show version
 
 Examples:
   echo "hello world" | ged 's/world/earth/'
@@ -128,6 +129,7 @@ type cliOptions struct {
 	helpMode    bool      // --help: show usage
 	versionMode bool      // --version: show version
 	explainMode bool      // --explain: describe rules in plain English
+	insensitive bool      // --insensitive / -i: case-insensitive for all rules
 	ruleArgs    []string  // remaining args that are rules
 }
 
@@ -169,6 +171,11 @@ func parseCliOptions(args []string) (*cliOptions, error) {
 
 		if arg == "--explain" {
 			opts.explainMode = true
+			continue
+		}
+
+		if arg == "--insensitive" || arg == "-i" {
+			opts.insensitive = true
 			continue
 		}
 
@@ -263,8 +270,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		return fmt.Errorf("usage: ged <rule> [rule...]\nTry 'ged --help' for more information.")
 	}
 
+	// Build global options from CLI flags.
+	var globalOpts []rule.RuleOption
+	if opts.insensitive {
+		globalOpts = append(globalOpts, rule.WithIgnoreCase())
+	}
+
 	// Parse all rules, handling { } blocks for conditionals.
-	allParsed, err := parser.ParseArgs(opts.ruleArgs)
+	allParsed, err := parser.ParseArgs(opts.ruleArgs, globalOpts...)
 	if err != nil {
 		return fmt.Errorf("error parsing rules: %w", err)
 	}

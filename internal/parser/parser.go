@@ -10,6 +10,10 @@ import (
 	"github.com/dlclark/regexp2"
 )
 
+// globalOpts holds options applied to all regex-based rules (e.g. --insensitive).
+// Set by ParseArgs before parsing begins; reset after parsing completes.
+var globalOpts []rule.RuleOption
+
 // ParseRule parses a rule string and returns the appropriate Rule.
 // It handles delimiter detection and dispatches to command-specific parsers.
 // Returns either a rule.LineRule or rule.DocumentRule (as any).
@@ -154,13 +158,15 @@ func ParseRule(input string) (any, error) {
 	}
 }
 
-// parseFlags reads a flags string and returns the corresponding RuleOptions.
+// parseFlags reads a flags string and returns the corresponding RuleOptions,
+// merged with any globalOpts (e.g. from --insensitive).
 // Supported flags:
 //
 //	g — global replacement (SubstitutionRule only)
 //	i — case-insensitive matching
 func parseFlags(flags string) []rule.RuleOption {
 	var opts []rule.RuleOption
+	opts = append(opts, globalOpts...)
 	if strings.Contains(flags, "g") {
 		opts = append(opts, rule.WithGlobal())
 	}
@@ -170,15 +176,26 @@ func parseFlags(flags string) []rule.RuleOption {
 	return opts
 }
 
+// emptyFlags returns globalOpts when no explicit flags are present.
+// Use instead of nil for rules that accept options but have no trailing flags.
+func emptyFlags() []rule.RuleOption {
+	if len(globalOpts) == 0 {
+		return nil
+	}
+	opts := make([]rule.RuleOption, len(globalOpts))
+	copy(opts, globalOpts)
+	return opts
+}
+
 // flagsFromParts extracts flags from the trailing element of a parts slice.
 // For commands like p/pat/ and d/pat/, flags are in parts[1].
 // For substitution s/pat/repl/flags, flags are in parts[2].
-// Returns the options parsed from the given index, or nil if index is out of range.
+// Returns the options parsed from the given index, or globalOpts if index is out of range.
 func flagsFromParts(parts []string, flagIndex int) []rule.RuleOption {
-	if flagIndex < len(parts) {
+	if flagIndex < len(parts) && parts[flagIndex] != "" {
 		return parseFlags(parts[flagIndex])
 	}
-	return nil
+	return emptyFlags()
 }
 
 // contextOptions holds parsed before/after context values.
@@ -231,10 +248,18 @@ func parseContextOptions(parts []string, startIndex int) (contextOptions, error)
 // flagsAndOptionsFromParts extracts both flags and context options from trailing parts.
 // Flags are parts without =, context options are parts with =.
 func flagsAndOptionsFromParts(parts []string, startIndex int) ([]rule.RuleOption, contextOptions, error) {
-	var opts []rule.RuleOption
+	opts := emptyFlags()
 	for i := startIndex; i < len(parts); i++ {
 		if !strings.Contains(parts[i], "=") {
-			opts = append(opts, parseFlags(parts[i])...)
+			// parseFlags already includes globalOpts, but we started with
+			// emptyFlags() so skip the duplicate by parsing raw flags only.
+			flagStr := parts[i]
+			if strings.Contains(flagStr, "g") {
+				opts = append(opts, rule.WithGlobal())
+			}
+			if strings.Contains(flagStr, "i") {
+				opts = append(opts, rule.WithIgnoreCase())
+			}
 		}
 	}
 	ctxOpts, err := parseContextOptions(parts, startIndex)
@@ -300,7 +325,7 @@ func parseCols(input string) (rule.LineRule, error) {
 		patternStr = regexp2.Escape(patternStr)
 	}
 
-	pattern, err := rule.CompilePattern(patternStr)
+	pattern, err := rule.CompilePattern(patternStr, emptyFlags()...)
 	if err != nil {
 		return nil, fmt.Errorf("invalid pattern in cols: %w", err)
 	}
@@ -667,7 +692,7 @@ func parseUniq(input string) (rule.DocumentRule, error) {
 		pattern = regexp2.Escape(pattern)
 	}
 
-	var opts []rule.RuleOption
+	opts := emptyFlags()
 	groupNum := 0
 
 	// Scan remaining parts — each is either a group number or flags
@@ -679,7 +704,13 @@ func parseUniq(input string) (rule.DocumentRule, error) {
 		if len(part) == 1 && part[0] >= '1' && part[0] <= '9' {
 			groupNum = int(part[0] - '0')
 		} else {
-			opts = append(opts, parseFlags(part)...)
+			// Parse per-rule flags (globalOpts already in opts via emptyFlags)
+			if strings.Contains(part, "g") {
+				opts = append(opts, rule.WithGlobal())
+			}
+			if strings.Contains(part, "i") {
+				opts = append(opts, rule.WithIgnoreCase())
+			}
 		}
 	}
 

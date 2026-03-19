@@ -1,0 +1,74 @@
+- name: --insensitive with substitution
+  args: ['--insensitive', 's/hello/world/']
+  input: "Hello HELLO hello"
+  output: "world HELLO hello\n"
+
+- name: --insensitive with global substitution
+  args: ['--insensitive', 's/hello/world/g']
+  input: "Hello HELLO hello"
+  output: "world world world\n"
+
+- name: -i short flag with substitution
+  args: ['-i', 's/hello/world/g']
+  input: "Hello HELLO hello"
+  output: "world world world\n"
+
+- name: --insensitive with print filter
+  args: ['--insensitive', 'p/error/']
+  input: "ERROR here\nok\nError there\nfine"
+  output: "ERROR here\nError there\n"
+
+- name: --insensitive with delete filter
+  args: ['--insensitive', 'd/error/']
+  input: "ERROR here\nok\nError there\nfine"
+  output: "ok\nfine\n"
+
+- name: --insensitive with take
+  args: ['--insensitive', 't/hello/']
+  input: "say HELLO world"
+  output: "HELLO\n"
+
+- name: --insensitive with remove
+  args: ['--insensitive', 'r/hello/']
+  input: "say HELLO world"
+  output: "say  world\n"
+
+- name: --insensitive with if condition
+  args: ['--insensitive', 'if/error/', '{', 'upper', '}']
+  input: "Error here\nok\nERROR there"
+  output: "ERROR HERE\nok\nERROR THERE\n"
+
+- name: --insensitive with on control
+  args: ['--insensitive', 'on/start/']
+  input: "before\nSTART\nafter"
+  output: "START\nafter\n"
+
+- name: --insensitive with uniq pattern
+  args: ['--insensitive', 'uniq/^\w+/']
+  input: "Abc first\nabc second\nDef third"
+  output: "Abc first\nDef third\n"
+
+- name: --insensitive combined with per-rule flag (no conflict)
+  args: ['--insensitive', 's/hello/world/g']
+  input: "HELLO hello"
+  output: "world world\n"
+
+- name: --insensitive with split
+  args: ['--insensitive', 'split/and/']
+  input: "one AND two And three"
+  output: "one \n two \n three\n"
+
+- name: --insensitive with insert
+  args: ['--insensitive', 'insert/todo/FIXME/']
+  input: "first\nTODO fix this\nlast"
+  output: "first\nTODO fix this\nFIXME\nlast\n"
+
+- name: --insensitive with group extraction
+  args: ['--insensitive', '1/name: (\w+)/']
+  input: "NAME: Alice"
+  output: "Alice\n"
+
+- name: per-rule i flag still works without --insensitive
+  args: ['s/hello/world/gi']
+  input: "Hello HELLO hello"
+  output: "world world world\n"

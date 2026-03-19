@@ -79,14 +79,15 @@ Delimiters:
     s`foo.bar`baz`    matches "foo.bar" literally
 
 CLI flags:
-  --input=FILE    Read from file (repeatable)
-  --write         Write back to input file(s)
-  --write-to=FILE Write output to specific file
-  --diff          Show diff instead of output
-  --color         Force colored output
-  --no-color      Force plain output
-  --explain       Describe what rules do
-  --help, -h      Show this help
+  --input=FILE       Read from file (repeatable)
+  --write            Write back to input file(s)
+  --write-to=FILE    Write output to specific file
+  --diff             Show diff instead of output
+  --color            Force colored output
+  --no-color         Force plain output
+  --insensitive, -i  Case-insensitive matching for all rules
+  --explain          Describe what rules do
+  --help, -h         Show this help
 
 Examples:
   echo "hello world" | ged 's/world/earth/'

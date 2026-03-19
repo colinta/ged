@@ -8,7 +8,12 @@ import (
 
 // ParseArgs parses a list of CLI arguments into rules, handling { } blocks
 // for conditional rules. Returns a flat list of LineRule and DocumentRule values.
-func ParseArgs(args []string) ([]any, error) {
+// The opts parameter supplies global options (e.g. WithIgnoreCase from --insensitive)
+// that are applied to every regex-based rule.
+func ParseArgs(args []string, opts ...rule.RuleOption) ([]any, error) {
+	globalOpts = opts
+	defer func() { globalOpts = nil }()
+
 	rules, remaining, err := parseArgs(args)
 	if err != nil {
 		return nil, err
