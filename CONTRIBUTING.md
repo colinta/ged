@@ -46,88 +46,28 @@ The single source of truth for usage docs is the `helpText` constant in `cmd/ged
 
 ## Releasing
 
-### 1. Verify
+`ged` does **not** use strict semver reset behavior. `minor` and `bug` increments are independent.
+
+Bump the version:
 
 ```bash
-just test
-just docs
+just bump bug    # or: major, minor
 ```
 
-### 2. Tag and push
+Then release that version:
 
 ```bash
-git tag X.Y.Z
-git push origin main --tags
+just release
 ```
 
-### 3. Build release binaries and create GitHub release
+`just release` runs tests, regenerates docs, tags the current `VERSION`, creates the GitHub
+release, and updates `homebrew-ged`.
+
+If `../homebrew-ged` exists, it uses that repo. Otherwise it clones `github.com/colinta/homebrew-ged`
+into `./homebrew-ged`, updates the formula, pushes it, and removes the temporary clone.
+
+If you need to rerun only the Homebrew step after a release already exists, use:
 
 ```bash
-mkdir -p /tmp/ged-release
-
-# Build for all platforms
-for os_arch in darwin-arm64 darwin-amd64 linux-arm64 linux-amd64; do
-  GOOS=${os_arch%-*} GOARCH=${os_arch#*-} CGO_ENABLED=0 \
-    go build -ldflags="-s -w" -o /tmp/ged-release/ged-${os_arch} ./cmd/ged
-done
-
-# Build man page
-npx marked-man README.md --output /tmp/ged-release/ged.1
-
-# Create tarballs
-cd /tmp/ged-release
-for os_arch in darwin-arm64 darwin-amd64 linux-arm64 linux-amd64; do
-  tar czf ged-${os_arch}.tar.gz ged-${os_arch} ged.1
-done
-
-# Create GitHub release
-cd /path/to/ged
-gh release create X.Y.Z /tmp/ged-release/ged-*.tar.gz \
-  --title "ged X.Y.Z" --notes "Release notes here"
-```
-
-### 4. Update the Homebrew tap
-
-Update `Formula/ged.rb` in the [homebrew-ged](https://github.com/colinta/homebrew-ged) repo
-with the new version number, download URLs, and sha256 hashes:
-
-```bash
-cd /tmp/ged-release
-for f in ged-*.tar.gz; do echo "$f"; shasum -a 256 "$f"; done
-```
-
-Update the `url`, `sha256`, and `version` fields in the formula for each platform,
-then push:
-
-```bash
-cd ~/src/github.com/colinta/homebrew-ged
-# edit Formula/ged.rb
-git add -A && git commit -m "ged X.Y.Z"
-git push origin main
-```
-
-## Installation
-
-### Homebrew (recommended — includes man page)
-
-```bash
-brew tap colinta/ged
-brew install ged
-```
-
-### Manual install (if Homebrew is broken)
-
-Download the binary for your platform from the
-[latest release](https://github.com/colinta/ged/releases/latest), then:
-
-```bash
-tar xzf ged-darwin-arm64.tar.gz    # or your platform
-cp ged-darwin-arm64 /usr/local/bin/ged
-cp ged.1 /usr/local/share/man/man1/ged.1
-```
-
-### Go install (binary only, no man page)
-
-```bash
-go install github.com/colinta/ged/cmd/ged@latest
+just publish-homebrew
 ```

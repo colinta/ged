@@ -9,6 +9,15 @@ install:
 test:
     go test ./...
 
+bump part:
+    python3 scripts/bump_version.py {{part}}
+
+release: test docs
+    python3 scripts/release_version.py
+
+publish-homebrew:
+    python3 scripts/publish_homebrew.py
+
 readme:
     ./scripts/generate-readme.sh > README.md
 

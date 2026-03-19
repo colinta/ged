@@ -2,10 +2,30 @@
 
 A streaming text editor for pipelines. Like `sed`, but with modern regex, intuitive syntax, and composable rules.
 
-## Install
+## Installation
+
+### Homebrew (recommended — includes man page)
+
+```bash
+brew tap colinta/ged
+brew install ged
+```
+
+### Go install (binary only, no man page)
 
 ```bash
 go install github.com/colinta/ged/cmd/ged@latest
+```
+
+### Manual install
+
+Download the binary for your platform from the
+[latest release](https://github.com/colinta/ged/releases/latest), then:
+
+```bash
+tar xzf ged-darwin-arm64.tar.gz    # or your platform
+cp ged-darwin-arm64 /usr/local/bin/ged
+cp ged.1 /usr/local/share/man/man1/ged.1
 ```
 
 ## Usage
