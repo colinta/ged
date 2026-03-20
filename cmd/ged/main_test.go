@@ -369,6 +369,30 @@ func TestRun_HelpShort(t *testing.T) {
 	}
 }
 
+func TestRun_HelpCommand(t *testing.T) {
+	out := &bytes.Buffer{}
+	err := run([]string{"help"}, nil, out, io.Discard)
+	if err != nil {
+		t.Fatalf("help returned error: %v", err)
+	}
+	if !strings.Contains(out.String(), "ged — a streaming text editor") {
+		t.Errorf("help should show help text")
+	}
+}
+
+func TestRun_VersionAliases(t *testing.T) {
+	for _, args := range [][]string{{"version"}, {"--version"}, {"-v"}} {
+		out := &bytes.Buffer{}
+		err := run(args, nil, out, io.Discard)
+		if err != nil {
+			t.Fatalf("%v returned error: %v", args, err)
+		}
+		if out.String() != "ged dev\n" {
+			t.Errorf("%v: got %q, want %q", args, out.String(), "ged dev\n")
+		}
+	}
+}
+
 func TestRun_NoArgs(t *testing.T) {
 	err := run([]string{}, nil, io.Discard, io.Discard)
 	if err == nil {

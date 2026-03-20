@@ -108,52 +108,13 @@ CLI flags:
   --insensitive, -i  Case-insensitive matching for all rules
   --explain          Describe what rules do
   --help, -h         Show this help
+  --version, -v      Show version
 
 Examples:
   echo "hello world" | ged 's/world/earth/'
   ged --input=log.txt 'p/ERROR/context=2'
   ged 's/old/new/g' sort uniq --input=data.txt --write
   ged 'if/TODO/' '{' upper '}' --input=notes.txt --diff
-```
-
-## Examples
-
-```bash
-# Simple substitution
-echo "hello world" | ged 's/world/earth/'
-
-# Global replace
-echo "aaa" | ged 's/a/b/g'
-
-# Filter lines (like grep)
-cat log.txt | ged 'p/ERROR/'
-
-# Filter with context (like grep -C)
-cat log.txt | ged 'p/ERROR/context=2'
-
-# Delete matching lines
-cat data.txt | ged 'd/^#/'
-
-# Chain multiple rules
-echo -e "c\na\nb" | ged 's/$/!/' sort
-
-# Conditional rules
-echo -e "hello\nworld" | ged 'if/hello/' '{' upper '}'
-
-# File editing
-ged 's/old/new/g' --input=file.txt --write
-
-# Show diff before editing
-ged 's/old/new/g' --input=file.txt --diff --color
-
-# Deduplicate by first word
-echo -e "abc one\n123 two\nabc three\n456 four" | ged 'uniq/^\w+/'
-
-# Deduplicate by capture group
-echo -e "1 abc x\n2 abc y\n3 def z" | ged 'uniq/^\d+ (\w+)/1'
-
-# Explain what rules do
-ged --explain 'p/error/i/context=2' 's/ERROR/WARNING/' upper
 ```
 
 ## License
