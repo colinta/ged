@@ -1,11 +1,43 @@
 #!/usr/bin/env python3
 
+from __future__ import annotations
+
 from pathlib import Path
+import subprocess
 import sys
 
 USAGE = "usage: just bump major|minor|bug"
 VALID_PARTS = {"major", "minor", "bug"}
-VERSION_FILE = Path(__file__).resolve().parent.parent / "VERSION"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+VERSION_FILE = PROJECT_ROOT / "VERSION"
+RELEASE_WARNING = "you should commit before running 'just release'"
+
+
+def run(command: list[str]) -> None:
+    subprocess.run(command, cwd=PROJECT_ROOT, check=True)
+
+
+def has_staged_changes() -> bool:
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--quiet"],
+        cwd=PROJECT_ROOT,
+    )
+    return result.returncode != 0
+
+
+def working_tree_is_clean() -> bool:
+    result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=PROJECT_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip() == ""
+
+
+def commit_version_bump(part: str) -> None:
+    run(["git", "commit", "-m", f"{part} version bump", "VERSION"])
 
 
 def main() -> int:
@@ -14,6 +46,7 @@ def main() -> int:
         return 1
 
     part = sys.argv[1]
+    had_staged_changes = has_staged_changes()
     version = VERSION_FILE.read_text().strip()
 
     try:
@@ -35,8 +68,22 @@ def main() -> int:
     new_version = f"{major}.{minor}.{bug}\n"
     VERSION_FILE.write_text(new_version)
     print(f"VERSION -> {new_version.strip()}")
+
+    if had_staged_changes:
+        print(RELEASE_WARNING)
+        return 0
+
+    commit_version_bump(part)
+
+    if not working_tree_is_clean():
+        print(RELEASE_WARNING)
+
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except subprocess.CalledProcessError as error:
+        print(f"command failed: {error.cmd}", file=sys.stderr)
+        raise SystemExit(error.returncode or 1)
