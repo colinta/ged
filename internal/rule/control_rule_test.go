@@ -100,6 +100,57 @@ func TestToggleRule_MatchLineItself(t *testing.T) {
 	}
 }
 
+// processMultipleRules is like processLines but applies multiple rules in order.
+func processMultipleRules(t *testing.T, rules []LineRule, lines []string) []string {
+	t.Helper()
+	ctx := &LineContext{}
+	for _, r := range rules {
+		if s, ok := r.(SetupRule); ok {
+			s.Setup(ctx)
+		}
+	}
+
+	var result []string
+	for i, line := range lines {
+		ctx.LineNum = i + 1
+		current := []string{line}
+		for _, r := range rules {
+			var next []string
+			for _, l := range current {
+				out, err := r.Apply(l, ctx)
+				if err != nil {
+					t.Fatalf("Apply error: %v", err)
+				}
+				next = append(next, out...)
+			}
+			current = next
+		}
+		if ctx.Printing != PrintOff {
+			result = append(result, current...)
+		}
+	}
+	return result
+}
+
+func TestAfterOff_StopsPrinting(t *testing.T) {
+	after, _ := NewAfterRule("start")
+	off, _ := NewOffRule("off")
+
+	result := processMultipleRules(t, []LineRule{after, off},
+		[]string{"start", "1", "2", "off", "3"})
+
+	expected := []string{"1", "2"}
+	if len(result) != len(expected) {
+		t.Errorf("expected %v, got %v", expected, result)
+		return
+	}
+	for i, want := range expected {
+		if result[i] != want {
+			t.Errorf("result[%d] = %q, want %q", i, result[i], want)
+		}
+	}
+}
+
 func TestOnOff_Combined(t *testing.T) {
 	on, _ := NewOnRule("start")
 	off, _ := NewOffRule("end")

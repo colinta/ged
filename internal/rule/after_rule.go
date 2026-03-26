@@ -31,6 +31,7 @@ func (r *AfterRule) Setup(ctx *LineContext) {
 func (r *AfterRule) Apply(line string, ctx *LineContext) ([]string, error) {
 	if GetState(ctx, r, false) {
 		ctx.Printing = PrintOn
+		SetState(ctx, r, false)
 	}
 	matched, err := r.pattern.MatchString(line)
 	if err != nil {
