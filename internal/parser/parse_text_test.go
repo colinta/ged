@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/colinta/ged/internal/rule"
@@ -81,6 +82,16 @@ func TestParseTextModificationRules(t *testing.T) {
 		_, err := ParseRule("prepend")
 		if err == nil {
 			t.Fatal("expected error for bare prepend")
+		}
+	})
+
+	t.Run("prefix is not a valid command", func(t *testing.T) {
+		_, err := ParseRule("prefix/hello")
+		if err == nil {
+			t.Fatal("expected error for invalid prefix command")
+		}
+		if !strings.Contains(err.Error(), "invalid delimiter") {
+			t.Fatalf("expected invalid delimiter error, got: %v", err)
 		}
 	})
 

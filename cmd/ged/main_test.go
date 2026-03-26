@@ -402,3 +402,20 @@ func TestRun_NoArgs(t *testing.T) {
 		t.Errorf("no-args error should mention --help, got: %v", err)
 	}
 }
+
+func TestRun_InvalidPrefixCommand(t *testing.T) {
+	out := &bytes.Buffer{}
+	errBuf := &bytes.Buffer{}
+	in := strings.NewReader("a\nb\n")
+
+	err := run([]string{"prefix/hello"}, in, out, errBuf)
+	if err == nil {
+		t.Fatal("expected error for invalid prefix command")
+	}
+	if !strings.Contains(err.Error(), "invalid delimiter") {
+		t.Fatalf("expected invalid delimiter error, got: %v", err)
+	}
+	if out.Len() != 0 {
+		t.Fatalf("expected no output on error, got %q", out.String())
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/colinta/ged/internal/rule"
 	"github.com/dlclark/regexp2"
@@ -124,6 +125,10 @@ func ParseRule(input string) (any, error) {
 	delimiter := input[1]
 	rest := input[2:]
 
+	if !isValidDelimiter(delimiter) {
+		return nil, fmt.Errorf("invalid delimiter %q: delimiters must be punctuation or quotes", delimiter)
+	}
+
 	// Split by delimiter, respecting backslash escapes
 	parts, err := splitByDelimiter(rest, delimiter)
 	if err != nil {
@@ -156,6 +161,14 @@ func ParseRule(input string) (any, error) {
 	} else {
 		return nil, fmt.Errorf("unknown command: %c", command)
 	}
+}
+
+func isValidDelimiter(delimiter byte) bool {
+	if delimiter == ':' || delimiter == '`' || delimiter == '\'' || delimiter == '"' {
+		return true
+	}
+	r := rune(delimiter)
+	return unicode.IsPunct(r) || unicode.IsSymbol(r)
 }
 
 // parseFlags reads a flags string and returns the corresponding RuleOptions,
