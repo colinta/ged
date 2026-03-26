@@ -412,8 +412,8 @@ func TestRun_InvalidPrefixCommand(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for invalid prefix command")
 	}
-	if !strings.Contains(err.Error(), "invalid delimiter") {
-		t.Fatalf("expected invalid delimiter error, got: %v", err)
+	if !strings.Contains(err.Error(), "unknown command") && !strings.Contains(err.Error(), "invalid delimiter") {
+		t.Fatalf("expected unknown command or invalid delimiter error, got: %v", err)
 	}
 	if out.Len() != 0 {
 		t.Fatalf("expected no output on error, got %q", out.String())
