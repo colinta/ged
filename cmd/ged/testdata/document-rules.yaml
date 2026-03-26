@@ -28,13 +28,13 @@
     c
   output: "a,b,c\n"
 
-- name: join bare (empty separator)
+- name: join bare (space separator)
   args: [join]
   input: |
     a
     b
     c
-  output: "abc\n"
+  output: "a b c\n"
 
 - name: line rules then sort
   args: [s/x/y, sort]

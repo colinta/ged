@@ -345,10 +345,10 @@ func parseCols(input string) (rule.LineRule, error) {
 	return rule.NewColumnsRule(pattern, spec, joiner), nil
 }
 
-// parseJoin handles "join" (bare) and "join/sep/" syntax.
+// parseJoin handles "join" (bare, default space) and "join/sep/" syntax.
 func parseJoin(input string) (*rule.JoinRule, error) {
 	if input == "join" {
-		return rule.NewJoinRule(""), nil
+		return rule.NewJoinRule(" "), nil
 	}
 
 	if len(input) < 5 {

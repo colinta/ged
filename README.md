@@ -59,7 +59,7 @@ Text rules:
 Document rules:
   sort                           Sort lines alphabetically
   reverse                        Reverse line order
-  join/separator/                Join lines into one
+  join[/separator/]              Join lines into one (default: space)
   lines                          Prepend line numbers
   count                          Output line count
   uniq                           Remove consecutive duplicates

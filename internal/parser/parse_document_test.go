@@ -36,9 +36,17 @@ func TestParseRule_JoinBare(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, ok := r.(*rule.JoinRule)
+	joinRule, ok := r.(*rule.JoinRule)
 	if !ok {
 		t.Fatalf("expected *JoinRule, got %T", r)
+	}
+
+	got, err := joinRule.ApplyDocument([]string{"a", "b", "c"})
+	if err != nil {
+		t.Fatalf("unexpected error applying join rule: %v", err)
+	}
+	if len(got) != 1 || got[0] != "a b c" {
+		t.Fatalf("got %v, want [\"a b c\"]", got)
 	}
 }
 

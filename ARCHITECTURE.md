@@ -88,7 +88,7 @@ When all inner rules are line rules, a `ConditionalLineRule` streams line-by-lin
 - **sort** - Alphabetic sort
 - **reverse** - Reverse line order
 - **join/separator/** - Join lines with separator
-- **join** - Join lines with empty separator
+- **join** - Join lines with a space separator by default
 
 ### Conditional Rules
 - **if/pattern/ { rules }** - Apply rules to matching lines
