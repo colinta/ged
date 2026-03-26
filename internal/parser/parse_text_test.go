@@ -58,6 +58,66 @@ func TestParseTextModificationRules(t *testing.T) {
 		}
 	})
 
+	t.Run("quote bare", func(t *testing.T) {
+		r, err := ParseRule("quote")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if _, ok := r.(*rule.QuoteRule); !ok {
+			t.Fatalf("expected *rule.QuoteRule, got %T", r)
+		}
+	})
+
+	t.Run("quote with char", func(t *testing.T) {
+		r, err := ParseRule("quote/'/")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if _, ok := r.(*rule.QuoteRule); !ok {
+			t.Fatalf("expected *rule.QuoteRule, got %T", r)
+		}
+	})
+
+	t.Run("quote with bracket", func(t *testing.T) {
+		r, err := ParseRule("quote/[/")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if _, ok := r.(*rule.QuoteRule); !ok {
+			t.Fatalf("expected *rule.QuoteRule, got %T", r)
+		}
+	})
+
+	t.Run("unquote bare", func(t *testing.T) {
+		r, err := ParseRule("unquote")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if _, ok := r.(*rule.UnquoteRule); !ok {
+			t.Fatalf("expected *rule.UnquoteRule, got %T", r)
+		}
+	})
+
+	t.Run("unquote with chars", func(t *testing.T) {
+		r, err := ParseRule("unquote/'\"`/")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if _, ok := r.(*rule.UnquoteRule); !ok {
+			t.Fatalf("expected *rule.UnquoteRule, got %T", r)
+		}
+	})
+
+	t.Run("unquote with bracket", func(t *testing.T) {
+		r, err := ParseRule("unquote/[/")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if _, ok := r.(*rule.UnquoteRule); !ok {
+			t.Fatalf("expected *rule.UnquoteRule, got %T", r)
+		}
+	})
+
 	t.Run("prepend", func(t *testing.T) {
 		r, err := ParseRule("prepend/>> /")
 		if err != nil {

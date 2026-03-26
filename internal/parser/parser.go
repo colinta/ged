@@ -24,12 +24,13 @@ func init() {
 	// -- Exact word commands (no delimiter) --------------------------------
 	r.Add(Exact("sort"), Returns(rule.NewSortRule))
 	r.Add(Exact("reverse", "rev"), Returns(rule.NewReverseRule))
-	r.Add(Exact("lines"), Returns(rule.NewLinesRule))
+	r.Add(Exact("lines", "line"), Returns(rule.NewLinesRule))
 	r.Add(Exact("count"), Returns(rule.NewCountRule))
-	r.Add(Exact("uniq"), Returns(rule.NewUniqRule))
 	r.Add(Exact("trim"), Returns(rule.NewTrimRule))
 	r.Add(Exact("triml"), Returns(rule.NewTrimLeftRule))
 	r.Add(Exact("trimr"), Returns(rule.NewTrimRightRule))
+	r.Add(Exact("quote"), handleBareQuote)
+	r.Add(Exact("unquote"), handleBareUnquote)
 	r.Add(Exact("upper"), Returns(rule.NewUpperRule))
 	r.Add(Exact("lower"), Returns(rule.NewLowerRule))
 	r.Add(Exact("join"), handleBareJoin)
@@ -37,7 +38,7 @@ func init() {
 	// -- Prefix commands (name + delimiter + parts) -----------------------
 
 	// uniq with pattern must come before generic prefix "u" if we ever add one
-	r.Add(Prefix("uniq"), handleUniq)
+	r.Add(Prefix("uniq", "unique"), handleUniq)
 
 	// Document text commands
 	r.Add(Prefix("begin"), handleDocText)
@@ -60,6 +61,8 @@ func init() {
 	r.Add(Prefix("toggle"), handleControl)
 
 	// Text modification with delimiter args
+	r.Add(Prefix("quote"), handleQuote)
+	r.Add(Prefix("unquote"), handleUnquote)
 	r.Add(Prefix("prepend"), handlePrepend)
 	r.Add(Prefix("append"), handleAppend)
 	r.Add(Prefix("surround"), handleSurround)
@@ -74,8 +77,7 @@ func init() {
 	r.Add(Prefix("s"), handleSubstitution)
 	r.Add(Prefix("print"), handlePrint)
 	r.Add(Prefix("p"), handlePrint)
-	r.Add(Prefix("del", "delete"), handleDelete)
-	r.Add(Prefix("d"), handleDelete)
+	r.Add(Prefix("d", "del", "delete", "!p", "!print"), handleDelete)
 	r.Add(Prefix("takeprint", "tp"), handleTakePrint)
 	r.Add(Prefix("printtake", "pt"), handleTakePrint)
 	r.Add(Prefix("removeprint", "rp"), handleRemovePrint)
@@ -99,6 +101,28 @@ func ParseRule(input string) (any, error) {
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
+
+func handleBareQuote(_ Command) (any, error) {
+	return rule.NewQuoteRule(""), nil
+}
+
+func handleQuote(cmd Command) (any, error) {
+	if err := cmd.RequireParts(1); err != nil {
+		return nil, err
+	}
+	return rule.NewQuoteRule(cmd.Parts[0]), nil
+}
+
+func handleBareUnquote(_ Command) (any, error) {
+	return rule.NewUnquoteRule(""), nil
+}
+
+func handleUnquote(cmd Command) (any, error) {
+	if err := cmd.RequireParts(1); err != nil {
+		return nil, err
+	}
+	return rule.NewUnquoteRule(cmd.Parts[0]), nil
+}
 
 func handleBareJoin(_ Command) (any, error) {
 	return rule.NewJoinRule(" "), nil
