@@ -76,6 +76,10 @@ func init() {
 	r.Add(Prefix("p"), handlePrint)
 	r.Add(Prefix("del", "delete"), handleDelete)
 	r.Add(Prefix("d"), handleDelete)
+	r.Add(Prefix("takeprint", "tp"), handleTakePrint)
+	r.Add(Prefix("printtake", "pt"), handleTakePrint)
+	r.Add(Prefix("removeprint", "rp"), handleRemovePrint)
+	r.Add(Prefix("printremove", "pr"), handleRemovePrint)
 	r.Add(Prefix("take"), handleTake)
 	r.Add(Prefix("t"), handleTake)
 	r.Add(Prefix("remove"), handleRemove)
@@ -294,6 +298,26 @@ func handleRemove(cmd Command) (any, error) {
 	}
 	opts := cmd.Flags(1)
 	return rule.NewRemoveRule(cmd.Parts[0], opts...)
+}
+
+func handleTakePrint(cmd Command) (any, error) {
+	if err := cmd.RequirePattern(); err != nil {
+		return nil, err
+	}
+	opts := cmd.Flags(1)
+	joiner := " "
+	if len(cmd.Parts) > 2 {
+		joiner = cmd.Parts[2]
+	}
+	return rule.NewTakePrintRule(cmd.Parts[0], joiner, opts...)
+}
+
+func handleRemovePrint(cmd Command) (any, error) {
+	if err := cmd.RequirePattern(); err != nil {
+		return nil, err
+	}
+	opts := cmd.Flags(1)
+	return rule.NewRemovePrintRule(cmd.Parts[0], opts...)
 }
 
 func handleGroup(cmd Command) (any, error) {

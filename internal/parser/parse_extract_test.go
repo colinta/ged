@@ -72,6 +72,74 @@ func TestParseRemove(t *testing.T) {
 	}
 }
 
+func TestParseTakePrint(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{name: "tp prefix", input: `tp/\d+/`},
+		{name: "pt prefix", input: `pt/\d+/`},
+		{name: "takeprint prefix", input: `takeprint/\d+/`},
+		{name: "printtake prefix", input: `printtake/\d+/`},
+		{name: "with flags", input: `tp/hello/gi`},
+		{name: "with pipe delimiter", input: `tp|\d+|`},
+		{name: "empty pattern errors", input: `tp//`, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ParseRule(tt.input)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ParseRule() error: %v", err)
+			}
+			if _, ok := result.(*rule.TakePrintRule); !ok {
+				t.Fatalf("expected *rule.TakePrintRule, got %T", result)
+			}
+		})
+	}
+}
+
+func TestParseRemovePrint(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{name: "rp prefix", input: `rp/\d+/`},
+		{name: "pr prefix", input: `pr/\d+/`},
+		{name: "removeprint prefix", input: `removeprint/\d+/`},
+		{name: "printremove prefix", input: `printremove/\d+/`},
+		{name: "with flags", input: `rp/hello/gi`},
+		{name: "with pipe delimiter", input: `rp|\d+|`},
+		{name: "empty pattern errors", input: `rp//`, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ParseRule(tt.input)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ParseRule() error: %v", err)
+			}
+			if _, ok := result.(*rule.RemovePrintRule); !ok {
+				t.Fatalf("expected *rule.RemovePrintRule, got %T", result)
+			}
+		})
+	}
+}
+
 func TestParseGroup(t *testing.T) {
 	tests := []struct {
 		name    string
