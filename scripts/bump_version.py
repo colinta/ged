@@ -36,8 +36,20 @@ def working_tree_is_clean() -> bool:
     return result.stdout.strip() == ""
 
 
-def commit_version_bump(part: str) -> None:
+def commit_version_bump(part: str) -> str:
     run(["git", "commit", "-m", f"{part} version bump", "VERSION"])
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=PROJECT_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
+def tag_version(version: str, commit: str) -> None:
+    run(["git", "tag", version, commit])
 
 
 def main() -> int:
@@ -73,7 +85,8 @@ def main() -> int:
         print(RELEASE_WARNING)
         return 0
 
-    commit_version_bump(part)
+    commit_sha = commit_version_bump(part)
+    tag_version(new_version.strip(), commit_sha)
 
     if not working_tree_is_clean():
         print(RELEASE_WARNING)
