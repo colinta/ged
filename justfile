@@ -22,7 +22,8 @@ readme:
     ./scripts/generate-readme.sh > README.md
 
 man: readme
-    npx marked-man README.md > ged.1
+    rm ged.1
+    <README.md ged 'after/```man' 'off/```' | npx marked-man > ged.1
 
 docs: readme man
 

@@ -30,11 +30,15 @@ Rules:
   d:linerange                    Delete by line number
   t/pattern/[flags]              Take (extract) matching text
   r/pattern/[flags]              Remove matching text from lines
+  tp/pattern/[flags]             Take+Print: keep matching lines, extract match
+  rp/pattern/[flags]             Remove+Print: keep matching lines, remove match
   N/pattern/[flags]              Extract capture group N (1-9)
 
 Text rules:
   trim, triml, trimr             Trim whitespace
   upper, lower                   Change case
+  quote, quote/char/             Wrap lines in quotes (default: ")
+  unquote, unquote/chars/        Strip matching quotes from line ends
   prepend/text/                  Add text before each line
   append/text/                   Add text after each line
   surround/before/after/         Wrap each line
@@ -69,6 +73,10 @@ Control flow:
   off/pattern/                   Stop printing at match
   after/pattern/                 Start printing after match
   toggle/pattern/                Toggle printing at each match
+
+Debugging:
+  tap                            Echo all lines to stderr
+  tap/header/                    Echo to stderr with a labeled header
 
 Flags (in trailing delimiter position):
   g   Global (all matches, not just first)

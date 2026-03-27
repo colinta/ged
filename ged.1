@@ -1,0 +1,164 @@
+.TH "" "1" "March 2026"
+.SH "NAME"
+\fB\fR
+.P
+ged — a streaming text editor for pipelines
+.P
+Usage: ged [flags] <rule> [rule\.\.\.]
+.P
+Rules:
+.br
+s/pattern/replacement/[flags]  Substitute (replace) matches
+.br
+s:linerange:replacement        Substitute by line number
+.br
+p/pattern/[flags][/options]    Print (keep) matching lines
+.br
+p:linerange                    Print by line number
+.br
+d/pattern/[flags][/options]    Delete matching lines
+.br
+d:linerange                    Delete by line number
+.br
+t/pattern/[flags]              Take (extract) matching text
+.br
+r/pattern/[flags]              Remove matching text from lines
+.br
+tp/pattern/[flags]             Take+Print: keep matching lines, extract match
+.br
+rp/pattern/[flags]             Remove+Print: keep matching lines, remove match
+.br
+N/pattern/[flags]              Extract capture group N (1\-9)
+.P
+Text rules:
+.br
+trim, triml, trimr             Trim whitespace
+.br
+upper, lower                   Change case
+.br
+quote, quote/char/             Wrap lines in quotes (default: ")
+.br
+unquote, unquote/chars/        Strip matching quotes from line ends
+.br
+prepend/text/                  Add text before each line
+.br
+append/text/                   Add text after each line
+.br
+surround/before/after/         Wrap each line
+.br
+cols/pattern/spec[/joiner]     Select/reorder columns
+.br
+split/pattern/                 Split lines on pattern
+.br
+insert/pattern/text/           Insert text after matching lines
+.P
+Document rules:
+.br
+sort                           Sort lines alphabetically
+.br
+reverse                        Reverse line order
+.br
+join[/separator/]              Join lines into one (default: space)
+.br
+lines                          Prepend line numbers
+.br
+count                          Output line count
+.br
+uniq                           Remove consecutive duplicates
+.br
+uniq/pattern/[group]/[flags]   Remove duplicates by matched key (global)
+.br
+begin/text/                    Prepend text to document
+.br
+end/text/                      Append text to document
+.br
+border/text/                   Add text to both ends
+.br
+exec/command/                  Pipe document through command
+.br
+xargs/command/                 Run command per line
+.P
+Conditionals:
+.br
+if/pattern/ { rules }          Apply rules to matching lines
+.br
+!if/pattern/ { rules }         Apply rules to non\-matching lines
+.br
+between/start/end/ { rules }   Apply rules between patterns
+.br
+ifany/pattern/ { rules }       Apply to all if any line matches
+.br
+ifnone/pattern/ { rules }      Apply to all if no line matches
+.br
+\|\.\.\. else { rules }             Else clause for any conditional
+.P
+Control flow:
+.br
+on/pattern/                    Start printing at match
+.br
+off/pattern/                   Stop printing at match
+.br
+after/pattern/                 Start printing after match
+.br
+toggle/pattern/                Toggle printing at each match
+.P
+Debugging:
+.br
+tap                            Echo all lines to stderr
+.br
+tap/header/                    Echo to stderr with a labeled header
+.P
+Flags (in trailing delimiter position):
+.br
+g   Global (all matches, not just first)
+.br
+i   Case\-insensitive matching
+.P
+Options (for p/ and d/ rules):
+.br
+context=N                      Include N lines before and after
+.br
+before=N                       Include N lines before match
+.br
+after=N                        Include N lines after match
+.P
+Delimiters:
+.br
+Any punctuation character works: s/foo/bar/ s|foo|bar| s#foo#bar#
+.br
+Quote delimiters (backtick, ', ") enable literal matching:
+.br
+s\fBfoo\.bar\fPbaz`    matches "foo\.bar" literally
+.P
+CLI flags:
+.br
+\-\-input=FILE       Read from file (repeatable)
+.br
+\-\-write            Write back to input file(s)
+.br
+\-\-write\-to=FILE    Write output to specific file
+.br
+\-\-diff             Show diff instead of output
+.br
+\-\-color            Force colored output
+.br
+\-\-no\-color         Force plain output
+.br
+\-\-insensitive, \-i  Case\-insensitive matching for all rules
+.br
+\-\-explain          Describe what rules do
+.br
+\-\-help, \-h         Show this help
+.br
+\-\-version, \-v      Show version
+.P
+Examples:
+.br
+echo "hello world" | ged 's/world/earth/'
+.br
+ged \-\-input=log\.txt 'p/ERROR/context=2'
+.br
+ged 's/old/new/g' sort uniq \-\-input=data\.txt \-\-write
+.br
+ged 'if/TODO/' '{' upper '}' \-\-input=notes\.txt \-\-diff
+

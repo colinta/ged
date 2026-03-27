@@ -41,7 +41,7 @@ cp ged.1 /usr/local/share/man/man1/ged.1
 
 ## Usage
 
-```
+```man
 HEADER
 
 go run ./cmd/ged help | sed 's/^//'
