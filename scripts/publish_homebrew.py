@@ -153,6 +153,7 @@ def commit_and_push(repo: Path, version: str) -> None:
 def publish_homebrew(version: str) -> None:
     homebrew_repo = locate_homebrew_repo()
     try:
+        run(["git", "pull"], cwd=homebrew_repo.path)
         update_formula(homebrew_repo.path, version)
         commit_and_push(homebrew_repo.path, version)
     finally:
