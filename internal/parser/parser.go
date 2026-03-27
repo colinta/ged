@@ -22,72 +22,67 @@ func init() {
 	r := commands
 
 	// -- Exact word commands (no delimiter) --------------------------------
-	r.Add(Exact("sort"), Returns(rule.NewSortRule))
-	r.Add(Exact("reverse", "rev"), Returns(rule.NewReverseRule))
-	r.Add(Exact("lines", "line"), Returns(rule.NewLinesRule))
-	r.Add(Exact("count"), Returns(rule.NewCountRule))
-	r.Add(Exact("trim"), Returns(rule.NewTrimRule))
-	r.Add(Exact("triml"), Returns(rule.NewTrimLeftRule))
-	r.Add(Exact("trimr"), Returns(rule.NewTrimRightRule))
-	r.Add(Exact("quote"), handleBareQuote)
-	r.Add(Exact("tap"), handleBareTap)
-	r.Add(Exact("unquote"), handleBareUnquote)
-	r.Add(Exact("upper"), Returns(rule.NewUpperRule))
-	r.Add(Exact("lower"), Returns(rule.NewLowerRule))
-	r.Add(Exact("join"), handleBareJoin)
-
-	// -- Prefix commands (name + delimiter + parts) -----------------------
+	r.Add(CommandOnly("sort"), Returns(rule.NewSortRule))
+	r.Add(CommandOnly("reverse", "rev"), Returns(rule.NewReverseRule))
+	r.Add(CommandOnly("lines", "line"), Returns(rule.NewLinesRule))
+	r.Add(CommandOnly("count"), Returns(rule.NewCountRule))
+	r.Add(CommandOnly("trim"), Returns(rule.NewTrimRule))
+	r.Add(CommandOnly("triml"), Returns(rule.NewTrimLeftRule))
+	r.Add(CommandOnly("trimr"), Returns(rule.NewTrimRightRule))
+	r.Add(CommandOnly("upper"), Returns(rule.NewUpperRule))
+	r.Add(CommandOnly("lower"), Returns(rule.NewLowerRule))
+	// -- Commands with args (name + delimiter + parts) ---------------------
 
 	// uniq with pattern must come before generic prefix "u" if we ever add one
-	r.Add(Prefix("uniq", "unique"), handleUniq)
+	r.Add(CommandWithOptionalArgs("uniq", "unique"), handleUniq)
 
 	// Document text commands
-	r.Add(Prefix("begin"), handleDocText)
-	r.Add(Prefix("end"), handleDocText)
-	r.Add(Prefix("border"), handleDocText)
+	r.Add(CommandWithArgs("begin"), handleDocText)
+	r.Add(CommandWithArgs("end"), handleDocText)
+	r.Add(CommandWithArgs("border"), handleDocText)
 
 	// Join with separator
-	r.Add(Prefix("join"), handleJoin)
+	r.Add(CommandWithOptionalArgs("join"), handleJoin)
 
 	// Conditionals (support ! prefix for negation)
-	r.Add(NegPrefix("between"), handleBetween)
-	r.Add(NegPrefix("ifany"), handleIfAny)
-	r.Add(NegPrefix("ifnone"), handleIfNone)
-	r.Add(NegPrefix("if"), handleIf)
+	r.Add(CommandOrNegated("between"), handleBetween)
+	r.Add(CommandOrNegated("ifany"), handleIfAny)
+	r.Add(CommandOrNegated("ifnone"), handleIfNone)
+	r.Add(CommandOrNegated("if"), handleIf)
 
 	// Control flow
-	r.Add(Prefix("on"), handleControl)
-	r.Add(Prefix("off"), handleControl)
-	r.Add(Prefix("after"), handleControl)
-	r.Add(Prefix("toggle"), handleControl)
+	r.Add(CommandWithArgs("on"), handleControl)
+	r.Add(CommandWithArgs("off"), handleControl)
+	r.Add(CommandWithArgs("after"), handleControl)
+	r.Add(CommandWithArgs("toggle"), handleControl)
 
 	// Text modification with delimiter args
-	r.Add(Prefix("tap"), handleTap)
-	r.Add(Prefix("quote"), handleQuote)
-	r.Add(Prefix("unquote"), handleUnquote)
-	r.Add(Prefix("prepend"), handlePrepend)
-	r.Add(Prefix("append"), handleAppend)
-	r.Add(Prefix("surround"), handleSurround)
-	r.Add(Prefix("cols"), handleCols)
-	r.Add(Prefix("split"), handleSplit)
-	r.Add(Prefix("insert"), handleInsert)
-	r.Add(Prefix("xargs"), handleXargs)
-	r.Add(Prefix("exec"), handleExec)
+	r.Add(CommandWithOptionalArgs("tap"), handleTap)
+	r.Add(CommandWithOptionalArgs("quote"), handleQuote)
+	r.Add(CommandWithOptionalArgs("unquote"), handleUnquote)
+	r.Add(CommandWithArgs("prepend"), handlePrepend)
+	r.Add(CommandWithArgs("append"), handleAppend)
+	r.Add(CommandWithArgs("surround"), handleSurround)
+	r.Add(CommandWithArgs("cols"), handleCols)
+	r.Add(CommandWithArgs("split"), handleSplit)
+	r.Add(CommandWithArgs("insert"), handleInsert)
+	r.Add(CommandWithArgs("xargs"), handleXargs)
+	r.Add(CommandWithArgs("exec"), handleExec)
 
 	// -- Single-character delimiter commands (with word aliases) -----------
-	r.Add(Prefix("sub", "substitute"), handleSubstitution)
-	r.Add(Prefix("s"), handleSubstitution)
-	r.Add(Prefix("print"), handlePrint)
-	r.Add(Prefix("p"), handlePrint)
-	r.Add(Prefix("d", "del", "delete", "!p", "!print"), handleDelete)
-	r.Add(Prefix("takeprint", "tp"), handleTakePrint)
-	r.Add(Prefix("printtake", "pt"), handleTakePrint)
-	r.Add(Prefix("removeprint", "rp"), handleRemovePrint)
-	r.Add(Prefix("printremove", "pr"), handleRemovePrint)
-	r.Add(Prefix("take"), handleTake)
-	r.Add(Prefix("t"), handleTake)
-	r.Add(Prefix("remove"), handleRemove)
-	r.Add(Prefix("r"), handleRemove)
+	r.Add(CommandWithArgs("sub", "substitute"), handleSubstitution)
+	r.Add(CommandWithArgs("s"), handleSubstitution)
+	r.Add(CommandWithArgs("print"), handlePrint)
+	r.Add(CommandWithArgs("p"), handlePrint)
+	r.Add(CommandWithArgs("d", "del", "delete", "!p", "!print"), handleDelete)
+	r.Add(CommandWithArgs("takeprint", "tp"), handleTakePrint)
+	r.Add(CommandWithArgs("printtake", "pt"), handleTakePrint)
+	r.Add(CommandWithArgs("removeprint", "rp"), handleRemovePrint)
+	r.Add(CommandWithArgs("printremove", "pr"), handleRemovePrint)
+	r.Add(CommandWithArgs("take"), handleTake)
+	r.Add(CommandWithArgs("t"), handleTake)
+	r.Add(CommandWithArgs("remove"), handleRemove)
+	r.Add(CommandWithArgs("r"), handleRemove)
 
 	// Digit group extraction: 1/pat/ through 9/pat/
 	r.Add(CharRange('1', '9'), handleGroup)
@@ -104,44 +99,40 @@ func ParseRule(input string) (any, error) {
 // Handlers
 // ---------------------------------------------------------------------------
 
-func handleBareTap(_ Command) (any, error) {
-	return rule.NewTapRule(""), nil
-}
-
 func handleTap(cmd Command) (any, error) {
+	if cmd.Delimiter == 0 {
+		return rule.NewTapRule(""), nil
+	}
 	if err := cmd.RequireParts(1); err != nil {
 		return nil, err
 	}
 	return rule.NewTapRule(cmd.Parts[0]), nil
 }
 
-func handleBareQuote(_ Command) (any, error) {
-	return rule.NewQuoteRule(""), nil
-}
-
 func handleQuote(cmd Command) (any, error) {
+	if cmd.Delimiter == 0 {
+		return rule.NewQuoteRule(""), nil
+	}
 	if err := cmd.RequireParts(1); err != nil {
 		return nil, err
 	}
 	return rule.NewQuoteRule(cmd.Parts[0]), nil
 }
 
-func handleBareUnquote(_ Command) (any, error) {
-	return rule.NewUnquoteRule(""), nil
-}
-
 func handleUnquote(cmd Command) (any, error) {
+	if cmd.Delimiter == 0 {
+		return rule.NewUnquoteRule(""), nil
+	}
 	if err := cmd.RequireParts(1); err != nil {
 		return nil, err
 	}
 	return rule.NewUnquoteRule(cmd.Parts[0]), nil
 }
 
-func handleBareJoin(_ Command) (any, error) {
-	return rule.NewJoinRule(" "), nil
-}
-
 func handleJoin(cmd Command) (any, error) {
+	if cmd.Delimiter == 0 {
+		return rule.NewJoinRule(" "), nil
+	}
 	if err := cmd.RequireParts(1); err != nil {
 		return nil, err
 	}
@@ -367,6 +358,9 @@ func handleGroup(cmd Command) (any, error) {
 }
 
 func handleUniq(cmd Command) (any, error) {
+	if cmd.Delimiter == 0 {
+		return rule.NewUniqRule(), nil
+	}
 	if err := cmd.RequirePattern(); err != nil {
 		return nil, fmt.Errorf("uniq requires a pattern")
 	}

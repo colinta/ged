@@ -123,9 +123,9 @@ func (r *registry) Parse(input string) (any, error) {
 // Matchers
 // ---------------------------------------------------------------------------
 
-// Exact matches when the full input equals one of the given names.
+// CommandOnly matches when the full input equals one of the given names.
 // No delimiter parsing is performed.
-func Exact(names ...string) Matcher {
+func CommandOnly(names ...string) Matcher {
 	return func(input string) (Command, bool) {
 		for _, n := range names {
 			if input == n {
@@ -136,11 +136,11 @@ func Exact(names ...string) Matcher {
 	}
 }
 
-// Prefix matches when the input starts with one of the given names followed
+// CommandWithArgs matches when the input starts with one of the given names followed
 // by a valid delimiter character. The first name is the canonical name stored
 // in Command.Name; the rest are aliases. The text after the name is split
 // by the delimiter into Command.Parts.
-func Prefix(names ...string) Matcher {
+func CommandWithArgs(names ...string) Matcher {
 	canonical := names[0]
 	// Sort by length descending so longer names match first
 	// (e.g., "substitute" before "sub")
@@ -177,16 +177,29 @@ func Prefix(names ...string) Matcher {
 	}
 }
 
-// NegPrefix is like Prefix but also matches a leading "!" which sets
+// CommandWithOptionalArgs matches either an exact bare word or a prefix with delimiter.
+// Use when a command works both with and without arguments (e.g. "uniq" vs "uniq/pattern/").
+func CommandWithOptionalArgs(names ...string) Matcher {
+	exact := CommandOnly(names...)
+	prefix := CommandWithArgs(names...)
+	return func(input string) (Command, bool) {
+		if cmd, ok := prefix(input); ok {
+			return cmd, true
+		}
+		return exact(input)
+	}
+}
+
+// CommandOrNegated is like CommandWithArgs but also matches a leading "!" which sets
 // Command.Inverted to true. The canonical name is names[0] (without "!").
-func NegPrefix(names ...string) Matcher {
-	positive := Prefix(names...)
+func CommandOrNegated(names ...string) Matcher {
+	positive := CommandWithArgs(names...)
 
 	negNames := make([]string, len(names))
 	for i, n := range names {
 		negNames[i] = "!" + n
 	}
-	negative := Prefix(negNames...)
+	negative := CommandWithArgs(negNames...)
 
 	return func(input string) (Command, bool) {
 		if cmd, ok := negative(input); ok {
