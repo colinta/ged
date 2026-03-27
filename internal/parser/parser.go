@@ -30,6 +30,7 @@ func init() {
 	r.Add(Exact("triml"), Returns(rule.NewTrimLeftRule))
 	r.Add(Exact("trimr"), Returns(rule.NewTrimRightRule))
 	r.Add(Exact("quote"), handleBareQuote)
+	r.Add(Exact("tap"), handleBareTap)
 	r.Add(Exact("unquote"), handleBareUnquote)
 	r.Add(Exact("upper"), Returns(rule.NewUpperRule))
 	r.Add(Exact("lower"), Returns(rule.NewLowerRule))
@@ -61,6 +62,7 @@ func init() {
 	r.Add(Prefix("toggle"), handleControl)
 
 	// Text modification with delimiter args
+	r.Add(Prefix("tap"), handleTap)
 	r.Add(Prefix("quote"), handleQuote)
 	r.Add(Prefix("unquote"), handleUnquote)
 	r.Add(Prefix("prepend"), handlePrepend)
@@ -101,6 +103,17 @@ func ParseRule(input string) (any, error) {
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
+
+func handleBareTap(_ Command) (any, error) {
+	return rule.NewTapRule(""), nil
+}
+
+func handleTap(cmd Command) (any, error) {
+	if err := cmd.RequireParts(1); err != nil {
+		return nil, err
+	}
+	return rule.NewTapRule(cmd.Parts[0]), nil
+}
 
 func handleBareQuote(_ Command) (any, error) {
 	return rule.NewQuoteRule(""), nil
