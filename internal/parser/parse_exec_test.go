@@ -49,7 +49,7 @@ func TestParseExec(t *testing.T) {
 		{"exec with pipe", "exec/grep foo | wc -l/", false},
 		{"exec alternate delimiter", "exec|cat -n|", false},
 		{"exec missing command", "exec//", true},
-		{"exec no delimiter", "exec", true},
+		{"exec bare defaults to sh", "exec", false},
 	}
 
 	for _, tt := range tests {

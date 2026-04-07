@@ -67,6 +67,7 @@ func init() {
 	r.Add(CommandWithArgs("split"), handleSplit)
 	r.Add(CommandWithArgs("insert"), handleInsert)
 	r.Add(CommandWithArgs("xargs"), handleXargs)
+	r.Add(CommandOnly("exec"), handleBareExec)
 	r.Add(CommandWithArgs("exec"), handleExec)
 
 	// -- Single-character delimiter commands (with word aliases) -----------
@@ -228,6 +229,10 @@ func handleXargs(cmd Command) (any, error) {
 		return nil, fmt.Errorf("xargs requires a command")
 	}
 	return rule.NewXargsRule(cmd.Parts[0]), nil
+}
+
+func handleBareExec(_ Command) (any, error) {
+	return rule.NewExecRule("sh"), nil
 }
 
 func handleExec(cmd Command) (any, error) {

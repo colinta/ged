@@ -57,7 +57,7 @@ Document rules:
   begin/text/                    Prepend text to document
   end/text/                      Append text to document
   border/text/                   Add text to both ends
-  exec/command/                  Pipe document through command
+  exec[/command/]                Pipe document through command (default: sh)
   xargs/command/                 Run command per line
 
 Conditionals:
