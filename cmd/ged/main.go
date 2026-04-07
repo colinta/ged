@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 
 	"github.com/colinta/ged/internal/diff"
@@ -16,6 +17,40 @@ import (
 
 // version is set at build time via -ldflags "-X main.version=..."
 var version = "dev"
+
+func init() {
+	if version != "dev" {
+		return
+	}
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return
+	}
+	// Extract VCS info embedded by go build.
+	var vcsRev, vcsDirty string
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			vcsRev = s.Value
+		case "vcs.modified":
+			if s.Value == "true" {
+				vcsDirty = "-dirty"
+			}
+		}
+	}
+	if vcsRev != "" {
+		short := vcsRev
+		if len(short) > 7 {
+			short = short[:7]
+		}
+		version = short + vcsDirty
+		return
+	}
+	// Fall back to module version (useful for `go install`).
+	if info.Main.Version != "" && info.Main.Version != "(devel)" {
+		version = info.Main.Version
+	}
+}
 
 const helpText = `ged — a streaming text editor for pipelines
 

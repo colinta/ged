@@ -1,10 +1,10 @@
 version := `cat VERSION`
 
 build:
-    go build -ldflags "-X main.version={{version}}" -o ged ./cmd/ged/
+    go build -o ged ./cmd/ged/
 
 install:
-    go install -ldflags "-X main.version={{version}}" ./cmd/ged/
+    go install ./cmd/ged/
 
 test:
     go test ./...
